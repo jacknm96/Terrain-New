@@ -48,12 +48,11 @@ public class TerrainPainter : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButton(0))
         {
-            Transform cam = Camera.main.transform;
-            Ray ray = new Ray(cam.position, cam.forward);
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit hit;
-            if (Physics.Raycast(ray, out hit, 500))
+            if (Physics.Raycast(ray, out hit))
             {
                 terrain = GetTerrainAtObject(hit.transform.gameObject);
                 SetEditValues(terrain);
@@ -181,8 +180,8 @@ public class TerrainPainter : MonoBehaviour
             // the first 2 0's indicate the coords where we start, the next values indicate how far we extend the area,
             // so what we are saying here is I want the heights starting at the Origin and extending the entire width and height of the terrain
             return terrain.terrainData.GetHeights(0, 0,
-            terrainData.heightmapWidth,
-            terrainData.heightmapHeight);
+            terrainData.heightmapResolution,
+            terrainData.heightmapResolution);
         }
         return default(float[,]);
     }
@@ -195,7 +194,7 @@ public class TerrainPainter : MonoBehaviour
     {
         if (terrain)
         {
-            return terrainData.heightmapWidth;
+            return terrainData.heightmapResolution;
         }
         return 0;
     }
@@ -208,7 +207,7 @@ public class TerrainPainter : MonoBehaviour
     {
         if (terrain)
         {
-            return terrainData.heightmapHeight;
+            return terrainData.heightmapResolution;
         }
         return 0;
         //test2.GetComponent<MeshRenderer>().material.mainTexture = texture;
