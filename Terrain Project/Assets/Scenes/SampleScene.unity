@@ -330,16 +330,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6287cd0b80c10f4c8720ed5b6308f0e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  brushIMG:
-  - {fileID: 2800000, guid: 94e5dd2784ae3a44a930dba86cba9f6e, type: 3}
+  brushIMG: []
   brushSelection: 0
-  areaOfEffectSize: 20
-  strength: 1
+  areaOfEffectSize: 100
+  strength: 0
   flattenHeight: 0
-  effectType: 4
-  paints:
-  - {fileID: 8574412962073106934, guid: 94eacaf6c9beeb14688f6178bb2d8dec, type: 2}
-  paint: 1
+  effectType: 0
+  paints: []
+  paint: 0
+  points:
+  - {x: 1, y: 0, z: 0}
+  - {x: 2, y: 0, z: 0}
+  - {x: 3.2829032, y: 0, z: -0.031067848}
+  - {x: 4.282903, y: 0, z: -0.031067848}
+  modes: 0000000000000000
+  loop: 0
 --- !u!154 &1715535114
 TerrainCollider:
   m_ObjectHideFlags: 0
