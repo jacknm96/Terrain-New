@@ -4,10 +4,10 @@ using System;
 public class BezierSpline : MonoBehaviour {
 
 	[SerializeField]
-	private Vector3[] points;
+	protected Vector3[] points;
 
-	[SerializeField] BezierControlPointMode[] modes;
-	[SerializeField] bool loop;
+	[SerializeField] protected BezierControlPointMode[] modes;
+	[SerializeField] protected bool loop;
 
 	//clear everything and reset to just a cubic bezier
 	public void Reset()

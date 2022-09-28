@@ -11,6 +11,15 @@ public class TerrainPainterInspector : Editor
 	private const float handleSize = 0.04f;
 	private const float pickSize = 0.06f;
 	[SerializeField] bool showVelocity;
+	//[SerializeField] Texture2D brush;
+	SerializedObject so;
+	SerializedProperty brush;
+	SerializedProperty paint;
+	int brushSize;
+	float brushStrength;
+	bool alignHeight;
+	bool foldout = true;
+	float flatten;
 
 	//for handlemode settings
 	private static Color[] modeColors = {
@@ -26,8 +35,15 @@ public class TerrainPainterInspector : Editor
 	//for selectable points
 	private int selectedIndex = -1; //default value for none selected
 
-	//when drawing the scene
-	private void OnSceneGUI()
+    private void OnEnable()
+    {
+		so = serializedObject;
+		brush = so.FindProperty(nameof(TerrainPainter.brushIMG));
+		paint = so.FindProperty(nameof(TerrainPainter.paints));
+    }
+
+    //when drawing the scene
+    private void OnSceneGUI()
 	{
 		painter = target as TerrainPainter;
 		handleTransform = painter.transform;
@@ -86,6 +102,79 @@ public class TerrainPainterInspector : Editor
 	public override void OnInspectorGUI()
 	{
 		painter = target as TerrainPainter;
+		EditorGUILayout.LabelField("Painting Info", EditorStyles.boldLabel);
+
+		// set brush size
+		EditorGUI.BeginChangeCheck();
+		brushSize = EditorGUILayout.IntField("Brush Size", brushSize);
+		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+		{
+			Undo.RecordObject(painter, "Change Brush Size");
+			EditorUtility.SetDirty(painter);
+			painter.areaOfEffectSize = brushSize;
+		}
+
+		// set brush strength
+		EditorGUI.BeginChangeCheck();
+		brushStrength = EditorGUILayout.FloatField("Brush Strength", brushStrength);
+		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+		{
+			Undo.RecordObject(painter, "Change Brush Strength");
+			EditorUtility.SetDirty(painter);
+			painter.strength = brushStrength;
+		}
+
+		// set brush img
+		EditorGUI.BeginChangeCheck();
+		//brush.objectReferenceValue = EditorGUILayout.ObjectField("Brush", brush.objectReferenceValue, typeof(Texture2D), false) as Texture2D;
+		EditorGUILayout.PropertyField(brush);
+		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+		{
+			Undo.RecordObject(painter, "Change Brush Texture");
+			EditorUtility.SetDirty(painter);
+			painter.brushIMG = (Texture2D)brush.objectReferenceValue;
+			painter.SetBrush();
+		}
+
+		// set paint texture
+		EditorGUI.BeginChangeCheck();
+		EditorGUILayout.PropertyField(paint);
+		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+		{
+			Undo.RecordObject(painter, "Change Paint");
+			EditorUtility.SetDirty(painter);
+			painter.paints = (TerrainLayer)paint.objectReferenceValue;
+		}
+
+		// align height toggle
+		alignHeight = EditorGUILayout.Toggle("Snap Height", alignHeight);
+		if (alignHeight)
+        {
+			foldout = EditorGUILayout.Foldout(foldout, "Height Alignment Info");
+			if (foldout)
+            {
+				// set flatten height
+				EditorGUI.BeginChangeCheck();
+				flatten = EditorGUILayout.FloatField("Flatten Height", flatten);
+				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+				{
+					Undo.RecordObject(painter, "Change Flatten Strength");
+					EditorUtility.SetDirty(painter);
+					painter.flattenHeight = flatten;
+				}
+			}
+			if (!Selection.activeTransform)
+            {
+				foldout = false;
+            }
+		}
+		
+
+		EditorGUILayout.Space();
+
+
+		EditorGUILayout.LabelField("Bezier Info", EditorStyles.boldLabel);
+
 		EditorGUI.BeginChangeCheck();
 
 		//add an option to connect the first and last nodes 
@@ -100,6 +189,7 @@ public class TerrainPainterInspector : Editor
 			EditorUtility.SetDirty(painter);
 			painter.Loop = loop;
 		}
+
 		if (selectedIndex >= 0 && selectedIndex < painter.GetPointCount)   //if default selected value of -1 we do not draw the point inspector
 		{
 			DrawSelectedPointInspector();
