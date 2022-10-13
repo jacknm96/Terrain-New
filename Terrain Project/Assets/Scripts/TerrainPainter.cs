@@ -6,7 +6,7 @@ using UnityEngine;
 public class TerrainPainter : BezierSpline
 {
     #region Painting
-    Terrain terrain;
+    public Terrain terrain;
     TerrainData terrainData;
 
     float[,] terrainHeightMap;  //a 2d array of floats to store 
@@ -33,6 +33,10 @@ public class TerrainPainter : BezierSpline
     public TerrainLayer paints;// a list containing all of the paints
     public int paint; // variable to select paint
     float[,,] splat; // A splat map is what unity uses to overlay all of your paints on to the terrain
+    float[,,] undoSplatHolder = new float[0, 0, 0]; // A splat map is what unity uses to overlay all of your paints on to the terrain
+    public int stepsPerCurve;
+    public bool snapHeight;
+    public bool painting;
 
     Vector3 startPos;
     Vector3 endPos;
@@ -58,6 +62,8 @@ public class TerrainPainter : BezierSpline
                 terrain = GetTerrainAtObject(hit.transform.gameObject);
                 SetEditValues(terrain);
                 GetTerrainCoordinates(hit, out int terX, out int terZ);
+                terX = (int)Mathf.Max(0, terX - areaOfEffectSize / 2);
+                terZ = (int)Mathf.Max(0, terZ - areaOfEffectSize / 2);
                 effectType = EffectType.paint;
                 paint = 1;
                 ModifyTerrain(terX, terZ);
@@ -95,7 +101,7 @@ public class TerrainPainter : BezierSpline
     /// <param name="hit"></param>
     /// <param name="x"></param>
     /// <param name="z"></param>
-    private void GetTerrainCoordinates(RaycastHit hit, out int x, out int z)
+    public void GetTerrainCoordinates(RaycastHit hit, out int x, out int z)
     {
         Vector3 tempTerrainCoodinates = hit.point - hit.transform.position;
         //This takes the world coords and makes them relative to the terrain
@@ -235,7 +241,7 @@ public class TerrainPainter : BezierSpline
                 heightMap[x, y] = pixelValue.grayscale / 255;
             }
         }
-
+        brush = heightMap;
         return heightMap;
     }
 
@@ -305,7 +311,7 @@ public class TerrainPainter : BezierSpline
         //RMC.SetIndicators();
     }
 
-    void ModifyTerrain(int x, int z)
+    public void ModifyTerrain(int x, int z)
     {
         //These AreaOfEffectModifier variables below will help us if we are modifying terrain that goes over the edge,
         //you will see in a bit that I use Xmod for the the z(or Y) values, which was because I did not realize at first
@@ -419,6 +425,23 @@ public class TerrainPainter : BezierSpline
             terrain.terrainData.SetAlphamaps(x - AOExMod, z - AOEzMod, splat);
             terrain.Flush();
         }
+    }
+
+    public void StartPainting()
+    {
+        undoSplatHolder = terrain.terrainData.GetAlphamaps(0, 0, terrain.terrainData.alphamapWidth, terrain.terrainData.alphamapHeight);
+        painting = true;
+    }
+
+    public void UndoPaint()
+    {
+        if (undoSplatHolder.Length > 0) terrain.terrainData.SetAlphamaps(0, 0, undoSplatHolder);
+    }
+
+    public void Bake()
+    {
+        undoSplatHolder = new float[0, 0, 0];
+        painting = false;
     }
 
     float GetSumOfFloats(float[] vals)

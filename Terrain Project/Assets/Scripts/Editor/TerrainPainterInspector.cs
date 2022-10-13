@@ -20,6 +20,9 @@ public class TerrainPainterInspector : Editor
 	bool alignHeight;
 	bool foldout = true;
 	float flatten;
+	bool painting;
+	int stepSizePerCurve;
+	int layerPaint;
 
 	//for handlemode settings
 	private static Color[] modeColors = {
@@ -104,24 +107,52 @@ public class TerrainPainterInspector : Editor
 		painter = target as TerrainPainter;
 		EditorGUILayout.LabelField("Painting Info", EditorStyles.boldLabel);
 
+		// set steps per curve
+		EditorGUI.BeginChangeCheck();
+		stepSizePerCurve = EditorGUILayout.IntField("Steps Per Curve", painter.stepsPerCurve);
+		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+		{
+			Undo.RecordObject(painter, "Change Steps Per Curve");
+			stepSizePerCurve = (int)Mathf.Max(stepSizePerCurve, 0);
+			painter.stepsPerCurve = stepSizePerCurve;
+			if (painting)
+			{
+				painter.UndoPaint();
+				PaintAlongBezier();
+			}
+			EditorUtility.SetDirty(painter);
+		}
+
 		// set brush size
 		EditorGUI.BeginChangeCheck();
-		brushSize = EditorGUILayout.IntField("Brush Size", brushSize);
+		brushSize = EditorGUILayout.IntField("Brush Size", painter.areaOfEffectSize);
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Change Brush Size");
-			EditorUtility.SetDirty(painter);
+			brushSize = (int)Mathf.Max(brushSize, 0);
 			painter.areaOfEffectSize = brushSize;
+			if (painting)
+			{
+				painter.UndoPaint();
+				PaintAlongBezier();
+			}
+			EditorUtility.SetDirty(painter);
 		}
 
 		// set brush strength
 		EditorGUI.BeginChangeCheck();
-		brushStrength = EditorGUILayout.FloatField("Brush Strength", brushStrength);
+		brushStrength = EditorGUILayout.Slider("Brush Strength", painter.strength, 0.0f, 1.0f);
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Change Brush Strength");
-			EditorUtility.SetDirty(painter);
+			brushStrength = Mathf.Max(brushStrength, 0);
 			painter.strength = brushStrength;
+			if (painting)
+			{
+				painter.UndoPaint();
+				PaintAlongBezier();
+			}
+			EditorUtility.SetDirty(painter);
 		}
 
 		// set brush img
@@ -131,42 +162,94 @@ public class TerrainPainterInspector : Editor
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Change Brush Texture");
-			EditorUtility.SetDirty(painter);
 			painter.brushIMG = (Texture2D)brush.objectReferenceValue;
 			painter.SetBrush();
+			if (painting)
+			{
+				painter.UndoPaint();
+				PaintAlongBezier();
+			}
+			EditorUtility.SetDirty(painter);
 		}
 
 		// set paint texture
 		EditorGUI.BeginChangeCheck();
-		EditorGUILayout.PropertyField(paint);
+		layerPaint = EditorGUILayout.IntField("Paint Layer", painter.paint);
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
-			Undo.RecordObject(painter, "Change Paint");
+			Undo.RecordObject(painter, "Change Paint Layer");
+			layerPaint = (int)Mathf.Max(layerPaint, 0);
+			painter.paint = layerPaint;
+			if (painting)
+			{
+				painter.UndoPaint();
+				PaintAlongBezier();
+			}
 			EditorUtility.SetDirty(painter);
-			painter.paints = (TerrainLayer)paint.objectReferenceValue;
 		}
 
 		// align height toggle
-		alignHeight = EditorGUILayout.Toggle("Snap Height", alignHeight);
+		alignHeight = EditorGUILayout.Toggle("Snap Height", painter.snapHeight);
 		if (alignHeight)
-        {
+		{
 			foldout = EditorGUILayout.Foldout(foldout, "Height Alignment Info");
 			if (foldout)
-            {
+			{
 				// set flatten height
 				EditorGUI.BeginChangeCheck();
 				flatten = EditorGUILayout.FloatField("Flatten Height", flatten);
 				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 				{
 					Undo.RecordObject(painter, "Change Flatten Strength");
-					EditorUtility.SetDirty(painter);
 					painter.flattenHeight = flatten;
+					EditorUtility.SetDirty(painter);
 				}
 			}
 			if (!Selection.activeTransform)
-            {
+			{
 				foldout = false;
-            }
+			}
+		}
+
+		// start painting
+		EditorGUI.BeginChangeCheck();
+		painting = EditorGUILayout.Toggle("Start Painting", painter.painting);
+		if (EditorGUI.EndChangeCheck())
+		{
+			Undo.RecordObject(painter, "Start/Stop Painting");
+			if (painting)
+			{
+				painter.StartPainting(); // cache paint values when start painting for reverting
+				PaintAlongBezier();
+			}
+			else
+			{
+				painter.UndoPaint();
+				painter.painting = painting = false;
+			}
+			EditorUtility.SetDirty(painter);
+		}
+		if (painting)
+        {
+			//live update paint along bezier curve to follow changes
+			//painter.UndoPaint();
+			//PaintAlongBezier();
+			//reset button
+			if (GUILayout.Button("Revert Changes"))
+			{
+				Undo.RecordObject(painter, "Reverting Changes");
+				painter.UndoPaint();
+				painter.painting = painting = false;
+				EditorUtility.SetDirty(painter);
+			}
+			//bake changes
+			if (GUILayout.Button("Bake"))
+			{
+				Undo.RecordObject(painter, "Bake Paints");
+				painter.Bake();
+				painter.painting = painting = false;
+				EditorUtility.SetDirty(painter);
+			}
 		}
 		
 
@@ -186,8 +269,8 @@ public class TerrainPainterInspector : Editor
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Toggle Loop");
-			EditorUtility.SetDirty(painter);
 			painter.Loop = loop;
+			EditorUtility.SetDirty(painter);
 		}
 
 		if (selectedIndex >= 0 && selectedIndex < painter.GetPointCount)   //if default selected value of -1 we do not draw the point inspector
@@ -203,9 +286,6 @@ public class TerrainPainterInspector : Editor
 		}
 
 	}
-
-
-
 
 
 	private void ShowDirections()
@@ -249,8 +329,37 @@ public class TerrainPainterInspector : Editor
 				Undo.RecordObject(painter, "Move Point");
 				EditorUtility.SetDirty(painter);
 				painter.SetControlPoint(index, handleTransform.InverseTransformPoint(point));
+				if (painting)
+                {
+					painter.UndoPaint();
+					PaintAlongBezier();
+                }
 			}
 		}
 		return point;
+	}
+
+	void PaintAlongBezier()
+    {
+		painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
+		Vector3 point = painter.GetPoint(0f);
+		int steps = stepSizePerCurve * painter.CurveCount;
+		for (int i = 1; i <= steps; i++)
+		{
+			point = painter.GetPoint(i / (float)steps);
+			Ray ray = new Ray(point + Vector3.up, Vector3.down);
+			RaycastHit hit;
+			if (Physics.Raycast(ray, out hit))
+			{
+				painter.terrain = painter.GetTerrainAtObject(hit.transform.gameObject);
+				painter.SetEditValues(painter.terrain);
+				painter.GetTerrainCoordinates(hit, out int terX, out int terZ);
+				terX = (int)Mathf.Max(0, terX - brushSize / 2);
+				terZ = (int)Mathf.Max(0, terZ - brushSize / 2);
+				painter.effectType = TerrainPainter.EffectType.paint;
+				painter.ModifyTerrain(terX, terZ);
+			}
+
+		}
 	}
 }
