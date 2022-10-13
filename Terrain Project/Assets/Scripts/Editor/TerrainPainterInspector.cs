@@ -109,11 +109,11 @@ public class TerrainPainterInspector : Editor
 
 		// set steps per curve
 		EditorGUI.BeginChangeCheck();
-		stepSizePerCurve = EditorGUILayout.IntField("Steps Per Curve", painter.stepsPerCurve);
+		stepSizePerCurve = EditorGUILayout.IntField(new GUIContent("Steps Per Curve", "Iterations per curve the painter will cast to the terrain"), painter.stepsPerCurve); ;
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Change Steps Per Curve");
-			stepSizePerCurve = (int)Mathf.Max(stepSizePerCurve, 0);
+			stepSizePerCurve = Mathf.Max(stepSizePerCurve, 1);
 			painter.stepsPerCurve = stepSizePerCurve;
 			if (painting)
 			{
@@ -129,7 +129,7 @@ public class TerrainPainterInspector : Editor
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Change Brush Size");
-			brushSize = (int)Mathf.Max(brushSize, 0);
+			brushSize = Mathf.Max(brushSize, 2);
 			painter.areaOfEffectSize = brushSize;
 			if (painting)
 			{
@@ -141,7 +141,7 @@ public class TerrainPainterInspector : Editor
 
 		// set brush strength
 		EditorGUI.BeginChangeCheck();
-		brushStrength = EditorGUILayout.Slider("Brush Strength", painter.strength, 0.0f, 1.0f);
+		brushStrength = EditorGUILayout.Slider(new GUIContent("Brush Strength", "Opacity"), painter.strength, 0.0f, 1.0f);
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Change Brush Strength");
@@ -158,7 +158,7 @@ public class TerrainPainterInspector : Editor
 		// set brush img
 		EditorGUI.BeginChangeCheck();
 		//brush.objectReferenceValue = EditorGUILayout.ObjectField("Brush", brush.objectReferenceValue, typeof(Texture2D), false) as Texture2D;
-		EditorGUILayout.PropertyField(brush);
+		EditorGUILayout.PropertyField(brush, new GUIContent("Brush Image", "Shape of the paint brush"));
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Change Brush Texture");
@@ -174,11 +174,11 @@ public class TerrainPainterInspector : Editor
 
 		// set paint texture
 		EditorGUI.BeginChangeCheck();
-		layerPaint = EditorGUILayout.IntField("Paint Layer", painter.paint);
+		layerPaint = EditorGUILayout.IntField(new GUIContent("Paint Layer", "Index of the layer paint to use from the terrain component"), painter.paint);
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, "Change Paint Layer");
-			layerPaint = (int)Mathf.Max(layerPaint, 0);
+			layerPaint = Mathf.Max(layerPaint, 0);
 			painter.paint = layerPaint;
 			if (painting)
 			{
@@ -231,9 +231,6 @@ public class TerrainPainterInspector : Editor
 		}
 		if (painting)
         {
-			//live update paint along bezier curve to follow changes
-			//painter.UndoPaint();
-			//PaintAlongBezier();
 			//reset button
 			if (GUILayout.Button("Revert Changes"))
 			{
@@ -329,7 +326,7 @@ public class TerrainPainterInspector : Editor
 				Undo.RecordObject(painter, "Move Point");
 				EditorUtility.SetDirty(painter);
 				painter.SetControlPoint(index, handleTransform.InverseTransformPoint(point));
-				if (painting)
+				if (painting) // if painting, realign paints with modified bezier curve
                 {
 					painter.UndoPaint();
 					PaintAlongBezier();
@@ -344,7 +341,7 @@ public class TerrainPainterInspector : Editor
 		painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
 		Vector3 point = painter.GetPoint(0f);
 		int steps = stepSizePerCurve * painter.CurveCount;
-		for (int i = 1; i <= steps; i++)
+		for (int i = 0; i <= steps; i++)
 		{
 			point = painter.GetPoint(i / (float)steps);
 			Ray ray = new Ray(point + Vector3.up, Vector3.down);
@@ -359,7 +356,6 @@ public class TerrainPainterInspector : Editor
 				painter.effectType = TerrainPainter.EffectType.paint;
 				painter.ModifyTerrain(terX, terZ);
 			}
-
 		}
 	}
 }

@@ -342,89 +342,113 @@ public class TerrainPainter : BezierSpline
             // this grabs the heightmap values within the brushes area of effect
             heights = targetTerrainData.GetHeights(x - AOExMod, z - AOEzMod, areaOfEffectSize + AOExMod - AOExMod1, areaOfEffectSize + AOEzMod - AOEzMod1); 
         }
-        //Raise Terrain
-        if (effectType == EffectType.raise)
+        
+        switch (effectType)
         {
-            for (int xx = 0; xx < areaOfEffectSize + AOEzMod - AOEzMod1; xx++)
-            {
-                for (int yy = 0; yy < areaOfEffectSize + AOExMod - AOExMod1; yy++)
-                {
-                    heights[xx, yy] += brush[xx - AOEzMod, yy - AOExMod] * strength; //for each point we raise the value  by the value of brush at the coords * the strength modifier
-                }
-            }
-            targetTerrainData.SetHeights(x - AOExMod, z - AOEzMod, heights); // This bit of code will save the change to the Terrain data file, this means that the changes will persist out of play mode into the edit mode
+            case EffectType.raise:
+                RaiseMap(x, z, AOExMod, AOEzMod, AOExMod1, AOEzMod1);
+                break;
+            case EffectType.lower:
+                LowerMap(x, z, AOExMod, AOEzMod, AOExMod1, AOEzMod1);
+                break;
+            case EffectType.flatten:
+                FlattenMap(x, z, AOExMod, AOEzMod, AOExMod1, AOEzMod1);
+                break;
+            case EffectType.smooth:
+                SmoothMap(x, z, AOExMod, AOEzMod, AOExMod1, AOEzMod1);
+                break;
+            case EffectType.paint:
+                PaintMap(x, z, AOExMod, AOEzMod, AOExMod1, AOEzMod1);
+                break;
         }
-        //Lower Terrain, just the reverse of raise terrain
-        else if (effectType == EffectType.lower)
+    }
+
+    //Raise Terrain
+    void RaiseMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
+    {
+        for (int xx = 0; xx < areaOfEffectSize + AOEzMod - AOEzMod1; xx++)
         {
-            for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
+            for (int yy = 0; yy < areaOfEffectSize + AOExMod - AOExMod1; yy++)
             {
-                for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
-                {
-                    heights[xx, yy] -= brush[xx - AOEzMod, yy - AOExMod] * strength;
-                }
+                heights[xx, yy] += brush[xx - AOEzMod, yy - AOExMod] * strength; //for each point we raise the value  by the value of brush at the coords * the strength modifier
             }
-            targetTerrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
         }
-        //this moves the current value towards our target value to flatten terrain
-        else if (effectType == EffectType.flatten)
+        targetTerrainData.SetHeights(x - AOExMod, z - AOEzMod, heights); // This bit of code will save the change to the Terrain data file, this means that the changes will persist out of play mode into the edit mode
+    }
+
+    //Lower Terrain, just the reverse of raise terrain
+    void LowerMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
+    {
+        for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
         {
-            for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
+            for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
             {
-                for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
-                {
-                    heights[xx, yy] = Mathf.MoveTowards(heights[xx, yy], flattenHeight / 600, brush[xx - AOEzMod, yy - AOExMod] * strength);
-                }
+                heights[xx, yy] -= brush[xx - AOEzMod, yy - AOExMod] * strength;
             }
-            targetTerrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
         }
-        //Takes the average of surrounding points and moves the point towards that height
-        else if (effectType == EffectType.smooth)
+        targetTerrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
+    }
+
+    //this moves the current value towards our target value to flatten terrain
+    void FlattenMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
+    {
+        for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
         {
-            float[,] heightAvg = new float[heights.GetLength(0), heights.GetLength(1)];
-            for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
+            for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
             {
-                for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
-                {
-                    heightAvg[xx, yy] = GetSurroundingHeights(heights, xx, yy); // calculates the value we want each point to move towards
-                }
+                heights[xx, yy] = Mathf.MoveTowards(heights[xx, yy], flattenHeight / 600, brush[xx - AOEzMod, yy - AOExMod] * strength);
             }
-            for (int xx1 = 0; xx1 < areaOfEffectSize + AOEzMod; xx1++)
-            {
-                for (int yy1 = 0; yy1 < areaOfEffectSize + AOExMod; yy1++)
-                {
-                    heights[xx1, yy1] = Mathf.MoveTowards(heights[xx1, yy1], heightAvg[xx1, yy1], brush[xx1 - AOEzMod, yy1 - AOExMod] * strength); // moves the points towards their targets
-                }
-            }
-            targetTerrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
         }
-        //This is where we do the painting, sorry its buried so far in here
-        else if (effectType == EffectType.paint)
+        targetTerrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
+    }
+
+    //Takes the average of surrounding points and moves the point towards that height
+    void SmoothMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
+    {
+        float[,] heightAvg = new float[heights.GetLength(0), heights.GetLength(1)];
+        for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
         {
-            splat = terrain.terrainData.GetAlphamaps(x - AOExMod, z - AOEzMod, areaOfEffectSize + AOExMod, areaOfEffectSize + AOEzMod); //grabs the splat map data for our brush area
-            for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
+            for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
             {
-                for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
+                heightAvg[xx, yy] = GetSurroundingHeights(heights, xx, yy); // calculates the value we want each point to move towards
+            }
+        }
+        for (int xx1 = 0; xx1 < areaOfEffectSize + AOEzMod; xx1++)
+        {
+            for (int yy1 = 0; yy1 < areaOfEffectSize + AOExMod; yy1++)
+            {
+                heights[xx1, yy1] = Mathf.MoveTowards(heights[xx1, yy1], heightAvg[xx1, yy1], brush[xx1 - AOEzMod, yy1 - AOExMod] * strength); // moves the points towards their targets
+            }
+        }
+        targetTerrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
+    }
+
+    //Paint terrain
+    void PaintMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
+    {
+        splat = terrain.terrainData.GetAlphamaps(x - AOExMod, z - AOEzMod, areaOfEffectSize + AOExMod, areaOfEffectSize + AOEzMod); //grabs the splat map data for our brush area
+        for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
+        {
+            for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
+            {
+                float[] weights = new float[terrain.terrainData.alphamapLayers]; //creates a float array and sets the size to be the number of paints your terrain has
+                for (int zz = 0; zz < splat.GetLength(2); zz++)
                 {
-                    float[] weights = new float[terrain.terrainData.alphamapLayers]; //creates a float array and sets the size to be the number of paints your terrain has
-                    for (int zz = 0; zz < splat.GetLength(2); zz++)
-                    {
-                        weights[zz] = splat[xx, yy, zz];//grabs the weights from the terrains splat map
-                    }
-                    weights[paint] += brush[xx - AOEzMod, yy - AOExMod] * strength * 2000; // adds weight to the paint currently selected with the int paint variable
-                    //this next bit normalizes all the weights so that they will add up to 1
-                    float sum = GetSumOfFloats(weights);
-                    for (int ww = 0; ww < weights.Length; ww++)
-                    {
-                        weights[ww] /= sum;
-                        splat[xx, yy, ww] = weights[ww];
-                    }
+                    weights[zz] = splat[xx, yy, zz];//grabs the weights from the terrains splat map
+                }
+                weights[paint] += brush[xx - AOEzMod, yy - AOExMod] * strength * 2000; // adds weight to the paint currently selected with the int paint variable
+                                                                                       //this next bit normalizes all the weights so that they will add up to 1
+                float sum = GetSumOfFloats(weights);
+                for (int ww = 0; ww < weights.Length; ww++)
+                {
+                    weights[ww] /= sum;
+                    splat[xx, yy, ww] = weights[ww];
                 }
             }
-            //applies the changes to the terrain, they will also persist
-            terrain.terrainData.SetAlphamaps(x - AOExMod, z - AOEzMod, splat);
-            terrain.Flush();
         }
+        //applies the changes to the terrain, they will also persist
+        terrain.terrainData.SetAlphamaps(x - AOExMod, z - AOEzMod, splat);
+        terrain.Flush();
     }
 
     public void StartPainting()
@@ -435,12 +459,17 @@ public class TerrainPainter : BezierSpline
 
     public void UndoPaint()
     {
-        if (undoSplatHolder.Length > 0) terrain.terrainData.SetAlphamaps(0, 0, undoSplatHolder);
+        if (undoSplatHolder.Length > 0)
+        {
+            terrain.terrainData.SetAlphamaps(0, 0, undoSplatHolder);
+            terrain.Flush();
+        }
     }
 
     public void Bake()
     {
         undoSplatHolder = new float[0, 0, 0];
+        terrain.Flush();
         painting = false;
     }
 
