@@ -38,6 +38,7 @@ public class TerrainPainterInspector : Editor
 	//for selectable points
 	private int selectedIndex = -1; //default value for none selected
 
+	//grab our serialized properties
     private void OnEnable()
     {
 		so = serializedObject;
@@ -56,18 +57,34 @@ public class TerrainPainterInspector : Editor
 		Vector3 p0 = ShowPoint(0);
 		for (int i = 1; i < painter.GetPointCount; i += 3)
 		{
-			Vector3 p1 = ShowPoint(i);
-			Vector3 p2 = ShowPoint(i + 1);
-			Vector3 p3 = ShowPoint(i + 2);
-			//draw the tangents
-			Handles.color = Color.grey;
-			Handles.DrawLine(p0, p1);
-			Handles.DrawLine(p1, p2); //optional
-			Handles.DrawLine(p2, p3);
+            Vector3 p1 = ShowPoint(i);
+            Vector3 p2 = ShowPoint(i + 1);
+            Vector3 p3 = ShowPoint(i + 2);
+            //draw the tangents
+            Handles.color = Color.grey;
+            Handles.DrawLine(p0, p1);
+            Handles.DrawLine(p1, p2); //optional
+            Handles.DrawLine(p2, p3);
 
-			//for drawing the bezier curve in the editor			
-			Handles.DrawBezier(p0, p3, p1, p2, Color.white, null, 2f);
-			p0 = p3;
+            //for drawing the bezier curve in the editor			
+            Handles.DrawBezier(p0, p3, p1, p2, Color.white, null, 2f);
+            p0 = p3;
+
+            //Vector3[] controlPoints = ShowPoints(i - 1);
+            //Handles.DrawBezier(controlPoints[0], controlPoints[1], controlPoints[2], controlPoints[3], Color.white, null, 2f);
+        }
+
+		//draws where along the curve brush will paint, and radius of brush
+		if (!painting)
+        {
+			Vector3 point;
+			int steps = stepSizePerCurve * painter.CurveCount;
+			for (int i = 0; i <= steps; i++)
+			{
+				point = painter.GetPoint(i / (float)steps);
+				Handles.color = Color.white;
+				Handles.DrawWireDisc(point, Vector3.up, brushSize);
+			}
 		}
 		if (showVelocity)
 		{
@@ -81,7 +98,8 @@ public class TerrainPainterInspector : Editor
 	{
 		GUILayout.Label("Selected Point");
 
-		EditorGUI.BeginChangeCheck(); //set the position of the selected point
+		EditorGUI.BeginChangeCheck(); 
+		//set the position of the selected point
 		Vector3 point = EditorGUILayout.Vector3Field("Position", painter.GetControlPoint(selectedIndex));
 
 		if (EditorGUI.EndChangeCheck())
@@ -131,6 +149,7 @@ public class TerrainPainterInspector : Editor
 			Undo.RecordObject(painter, "Change Brush Size");
 			brushSize = Mathf.Max(brushSize, 2);
 			painter.areaOfEffectSize = brushSize;
+			painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
 			if (painting)
 			{
 				painter.UndoPaint();
@@ -164,6 +183,7 @@ public class TerrainPainterInspector : Editor
 			Undo.RecordObject(painter, "Change Brush Texture");
 			painter.brushIMG = (Texture2D)brush.objectReferenceValue;
 			painter.SetBrush();
+			painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
 			if (painting)
 			{
 				painter.UndoPaint();
@@ -189,12 +209,20 @@ public class TerrainPainterInspector : Editor
 		}
 
 		// align height toggle
+		EditorGUI.BeginChangeCheck();
 		alignHeight = EditorGUILayout.Toggle("Snap Height", painter.snapHeight);
+		if (EditorGUI.EndChangeCheck())
+        {
+			Undo.RecordObject(painter, "Height toggle");
+			painter.snapHeight = alignHeight;
+			EditorUtility.SetDirty(painter);
+        }
 		if (alignHeight)
 		{
 			foldout = EditorGUILayout.Foldout(foldout, "Height Alignment Info");
 			if (foldout)
 			{
+				EditorGUI.indentLevel++;
 				// set flatten height
 				EditorGUI.BeginChangeCheck();
 				flatten = EditorGUILayout.FloatField("Flatten Height", flatten);
@@ -204,6 +232,7 @@ public class TerrainPainterInspector : Editor
 					painter.flattenHeight = flatten;
 					EditorUtility.SetDirty(painter);
 				}
+				EditorGUI.indentLevel--;
 			}
 			if (!Selection.activeTransform)
 			{
@@ -220,6 +249,7 @@ public class TerrainPainterInspector : Editor
 			if (painting)
 			{
 				painter.StartPainting(); // cache paint values when start painting for reverting
+				painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
 				PaintAlongBezier();
 			}
 			else
@@ -284,7 +314,7 @@ public class TerrainPainterInspector : Editor
 
 	}
 
-
+	// draws the tangent vectors along the bezier curve using handles
 	private void ShowDirections()
 	{
 		Handles.color = Color.green;
@@ -295,7 +325,6 @@ public class TerrainPainterInspector : Editor
 		{
 			point = painter.GetPoint(i / (float)steps);
 			Handles.DrawLine(point, point + painter.GetVelocity(i / (float)steps) * directionScale);
-
 		}
 	}
 
@@ -336,26 +365,143 @@ public class TerrainPainterInspector : Editor
 		return point;
 	}
 
+	Vector3[] ShowPoints(int index)
+    {
+		Vector3[] controlPoints = new Vector3[4];
+		for (int i = index; i < index + 4; i++)
+        {
+			controlPoints[i - index] = handleTransform.TransformPoint(painter.GetControlPoint(i));
+			/*float t = (index / (float)(painter.CurveCount * 3));
+			Vector3 point;
+			if (i == index || i == index + 3) point = handleTransform.TransformPoint(painter.GetControlPoint(i));
+			else point = handleTransform.TransformPoint(painter.GetPoint(t));
+			float size = HandleUtility.GetHandleSize(point);
+			//make the first node bigger
+			if (index == 0)
+			{
+				size *= 2f;
+			}
+			//set the color of handles
+			Handles.color = modeColors[(int)painter.GetControlPointMode(i)];
+
+			if (Handles.Button(point, handleRotation, size * handleSize, size * pickSize, Handles.DotHandleCap))
+			{
+				selectedIndex = i; //set the selected control point
+				Repaint();
+			}
+			if (selectedIndex == i)
+			{
+				EditorGUI.BeginChangeCheck();
+				point = Handles.DoPositionHandle(point, handleRotation);
+				if (EditorGUI.EndChangeCheck())
+				{
+					Undo.RecordObject(painter, "Move Point");
+					EditorUtility.SetDirty(painter);
+					painter.SetControlPoint(i, handleTransform.InverseTransformPoint(point));
+					if (painting) // if painting, realign paints with modified bezier curve
+					{
+						painter.UndoPaint();
+						PaintAlongBezier();
+					}
+				}
+			}*/
+		}
+		Vector3 handlePoint1 = handleTransform.TransformPoint(painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3)));
+		Vector3 handlePoint2 = handleTransform.TransformPoint(painter.GetPoint((index + 2) / (float)(painter.CurveCount * 3)));
+		Vector3[] handlePoints = {controlPoints[0], handlePoint1, handlePoint2, controlPoints[3] }; // points that are shown to use, along curve
+		for (int i = 0; i < handlePoints.Length; i++)
+        {
+			float size = HandleUtility.GetHandleSize(handlePoints[i]);
+			//make the first node bigger
+			if (index == 0)
+			{
+				size *= 2f;
+			}
+			//set the color of handles
+			Handles.color = modeColors[(int)painter.GetControlPointMode(index)];
+
+			if (Handles.Button(handlePoints[i], handleRotation, size * handleSize, size * pickSize, Handles.DotHandleCap))
+			{
+				selectedIndex = index + i; //set the selected control point
+				Repaint();
+			}
+			if (selectedIndex == index + i)
+			{
+				EditorGUI.BeginChangeCheck();
+				handlePoints[i] = Handles.DoPositionHandle(handlePoints[i], handleRotation);
+				if (EditorGUI.EndChangeCheck())
+				{
+					Undo.RecordObject(painter, "Move Point");
+					EditorUtility.SetDirty(painter);
+					//painter.SetControlPoint(index, handleTransform.InverseTransformPoint(handlePoints[i]));
+
+					// if index % 3 == 0, we are at root point and no difference between handle and control point
+					if (selectedIndex % 3 != 0 && CalculateBezierControlPoints(controlPoints[0], handlePoint1, handlePoint2, controlPoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
+					{
+						painter.SetControlPoint(index + 1, handleTransform.InverseTransformPoint(controlPoints[1]));
+						painter.SetControlPoint(index + 2, handleTransform.InverseTransformPoint(controlPoints[2]));
+					} else painter.SetControlPoint(index, handleTransform.InverseTransformPoint(handlePoints[i]));
+					if (painting) // if painting, realign paints with modified bezier curve
+					{
+						painter.UndoPaint();
+						PaintAlongBezier();
+					}
+				}
+			}
+		}
+		return controlPoints;
+    }
+
+	// steps through the bezier spline, every step casting to the terrain and painting at that location
 	void PaintAlongBezier()
     {
-		painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
-		Vector3 point = painter.GetPoint(0f);
+		Vector3 point;
+		Ray ray;
+		RaycastHit hit;
 		int steps = stepSizePerCurve * painter.CurveCount;
 		for (int i = 0; i <= steps; i++)
 		{
 			point = painter.GetPoint(i / (float)steps);
-			Ray ray = new Ray(point + Vector3.up, Vector3.down);
-			RaycastHit hit;
+			ray = new Ray(point + Vector3.up, Vector3.down);
 			if (Physics.Raycast(ray, out hit))
 			{
 				painter.terrain = painter.GetTerrainAtObject(hit.transform.gameObject);
 				painter.SetEditValues(painter.terrain);
 				painter.GetTerrainCoordinates(hit, out int terX, out int terZ);
-				terX = (int)Mathf.Max(0, terX - brushSize / 2);
-				terZ = (int)Mathf.Max(0, terZ - brushSize / 2);
+				terX = Mathf.Max(0, terX - brushSize / 2);
+				terZ = Mathf.Max(0, terZ - brushSize / 2);
 				painter.effectType = TerrainPainter.EffectType.paint;
 				painter.ModifyTerrain(terX, terZ);
 			}
 		}
 	}
+
+	bool CalculateBezierControlPoints(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float u, float v, ref Vector3 control1, ref Vector3 control2)
+	{
+		float a = 0.0f, b = 0.0f, c = 0.0f, d = 0.0f, det = 0.0f;
+
+		if ((u <= 0.0) || (u >= 1.0) || (v <= 0.0) || (v >= 1.0) || (u >= v))
+			return false; /* failure */
+
+		a = 3 * (1 - u) * (1 - u) * u; 
+		b = 3 * (1 - u) * u * u;
+		c = 3 * (1 - v) * (1 - v) * v; 
+		d = 3 * (1 - v) * v * v;
+		det = a * d - b * c;
+		/* unnecessary, but just in case... */
+		if (det == 0.0) return false; /* failure */
+
+		control1.x = d * p1.x - b * p2.x;
+		control1.y = d * p1.y - b * p2.y;
+		control1.z = d * p1.z - b * p2.z;
+		control1 /= det;
+
+		control2.x = (-c) * p1.x + a * p2.x;
+		control2.y = (-c) * p1.y + a * p2.y;
+		control2.z = (-c) * p1.z + a * p2.z;
+		control2 /= det;
+
+		return true; /* success */
+	}
+
 }
