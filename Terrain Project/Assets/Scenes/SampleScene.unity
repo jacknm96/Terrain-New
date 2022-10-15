@@ -332,23 +332,24 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   points:
   - {x: 158.94012, y: 0, z: 34.03427}
-  - {x: 233.98232, y: -74.403175, z: 99.764145}
-  - {x: 392.01767, y: 148.80638, z: 101.290886}
+  - {x: 330.3009, y: 0, z: 41.929836}
+  - {x: 468.3262, y: 0, z: 182.44496}
   - {x: 482.56104, y: 0, z: 94.76467}
   modes: 0000000000000000
   loop: 0
   terrain: {fileID: 1715535115}
   brushIMG: {fileID: 2800000, guid: 17405fba9d20b47408239b3e82d60232, type: 3}
   areaOfEffectSize: 15
-  strength: 0
+  paintStrength: 1
+  heightStrength: 0
   flattenHeight: 5
-  effectType: 5
+  effectType: 4
   paints: {fileID: 8574412962073106934, guid: 950288b0204552e48afc891864dd7813, type: 2}
   paint: 1
   stepsPerCurve: 9
-  snapHeight: 1
+  snapHeight: 0
   painting: 0
-  heightAdjustmentArea: 15
+  heightAdjustmentArea: 37
   heightAdjustmentSlope: 0
 --- !u!154 &1715535114
 TerrainCollider:

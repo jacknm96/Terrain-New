@@ -26,10 +26,12 @@ public class TerrainPainter : BezierSpline
         heightSnap
     };
     public Texture2D brushIMG; // This will allow you to switch brushes
-    float[,] brush; // this stores the brush.png pixel data
+    float[,] paintBrush; // this stores the brush.png pixel data
+    float[,] heightBrush; // this stores the brush.png pixel data
     public int areaOfEffectSize = 100; // size of the brush
     [Range(0.01f, 1f)] // you can remove this if you want
-    public float strength; // brush strength
+    public float paintStrength; // brush strength
+    public float heightStrength; // height strength
     public float flattenHeight = 0; // the height to which the flatten mode will go
     public EffectType effectType;
     public TerrainLayer paints;// a list containing all of the paints
@@ -40,7 +42,7 @@ public class TerrainPainter : BezierSpline
     public bool snapHeight;
     public bool painting;
 
-    public float heightAdjustmentArea;
+    public int heightAdjustmentArea;
     public float heightAdjustmentSlope;
 
     Vector3 startPos;
@@ -49,7 +51,8 @@ public class TerrainPainter : BezierSpline
     // Start is called before the first frame update
     void Start()
     {
-        brush = GenerateBrush(brushIMG, areaOfEffectSize);
+        GenerateBrush(brushIMG, areaOfEffectSize);
+        GenerateBrush(brushIMG, heightAdjustmentArea, true);
         effectType = EffectType.paint;
         terrain = FindObjectOfType<Terrain>();
         terrainData = terrain.terrainData;
@@ -136,7 +139,7 @@ public class TerrainPainter : BezierSpline
     private float GetSurroundingHeights(float[,] height, int x, int z)
     {
         float value; // this will temporarily hold the value at each point
-        float avg = height[x, z]; // we will add all the heights to this and divide by int num bellow to get the average height
+        float avg = terrainHeightMap[x, z]; // we will add all the heights to this and divide by int num bellow to get the average height
         int num = 1;
         for (int i = 0; i < 4; i++) //this will loop us through the possible surrounding spots
         {
@@ -144,13 +147,13 @@ public class TerrainPainter : BezierSpline
             {
                 // These give us the values surrounding the point
                 if (i == 0)
-                { value = height[x + 1, z]; }
+                { value = terrainHeightMap[x + 1, z]; }
                 else if (i == 1)
-                { value = height[x - 1, z]; }
+                { value = terrainHeightMap[x - 1, z]; }
                 else if (i == 2)
-                { value = height[x, z + 1]; }
+                { value = terrainHeightMap[x, z + 1]; }
                 else
-                { value = height[x, z - 1]; }
+                { value = terrainHeightMap[x, z - 1]; }
                 num++; // keeps track of how many iterations were successful  
                 avg += value;
             }
@@ -244,7 +247,7 @@ public class TerrainPainter : BezierSpline
     /// <param name="texture"></param>
     /// <param name="size"></param>
     /// <returns></returns>
-    public float[,] GenerateBrush(Texture2D texture, int size)
+    public float[,] GenerateBrush(Texture2D texture, int size, bool height = false)
     {
         float[,] heightMap = new float[size, size];//creates a 2d array which will store our brush
         Texture2D scaledBrush = ResizeBrush(texture, size, size); 
@@ -257,7 +260,8 @@ public class TerrainPainter : BezierSpline
                 heightMap[x, y] = pixelValue.grayscale / 255;
             }
         }
-        brush = heightMap;
+        if (!height) paintBrush = heightMap;
+        else heightBrush = heightMap;
         return heightMap;
     }
 
@@ -311,19 +315,19 @@ public class TerrainPainter : BezierSpline
         { areaOfEffectSize = 50; }
         else if (areaOfEffectSize < 1)
         { areaOfEffectSize = 1; }
-        brush = GenerateBrush(brushIMG, areaOfEffectSize); // regenerates the brush with new size
+        paintBrush = GenerateBrush(brushIMG, areaOfEffectSize); // regenerates the brush with new size
     }
     public void SetBrushStrength(float value)//same idea as SetBrushSize()
     {
-        strength += value;
-        if (strength > 1)
-        { strength = 1; }
-        else if (strength < 0.01f)
-        { strength = 0.01f; }
+        paintStrength += value;
+        if (paintStrength > 1)
+        { paintStrength = 1; }
+        else if (paintStrength < 0.01f)
+        { paintStrength = 0.01f; }
     }
-    public void SetBrush()
+    public void SetBrush(bool height = false)
     {
-        brush = GenerateBrush(brushIMG, areaOfEffectSize);
+        GenerateBrush(brushIMG, height ? heightAdjustmentArea : areaOfEffectSize, height);
         //RMC.SetIndicators();
     }
 
@@ -341,27 +345,31 @@ public class TerrainPainter : BezierSpline
         int AOEzMod = 0;
         int AOExMod1 = 0;
         int AOEzMod1 = 0;
+
+        int areaSize = (effectType == EffectType.paint) ? areaOfEffectSize : heightAdjustmentArea;
+
         if (x < 0) // if the brush goes off the negative end of the x axis we set the mod == to it to offset the edited area
         {
             AOExMod = x;
         }
-        else if (x + areaOfEffectSize > terrainHeightMapWidth)// if the brush goes off the posative end of the x axis we set the mod == to this
+        else if (x + areaSize > terrainHeightMapWidth)// if the brush goes off the posative end of the x axis we set the mod == to this
         {
-            AOExMod1 = x + areaOfEffectSize - terrainHeightMapWidth;
+            AOExMod1 = x + areaSize - terrainHeightMapWidth;
         }
 
         if (z < 0)//same as with x
         {
             AOEzMod = z;
         }
-        else if (z + areaOfEffectSize > terrainHeightMapHeight)
+        else if (z + areaSize > terrainHeightMapHeight)
         {
-            AOEzMod1 = z + areaOfEffectSize - terrainHeightMapHeight;
+            AOEzMod1 = z + areaSize - terrainHeightMapHeight;
         }
         if (effectType != EffectType.paint) // the following code will apply the terrain height modifications
         {
             // this grabs the heightmap values within the brushes area of effect
-            heights = terrain.terrainData.GetHeights(x - AOExMod, z - AOEzMod, areaOfEffectSize + AOExMod - AOExMod1, areaOfEffectSize + AOEzMod - AOEzMod1); 
+            heights = terrain.terrainData.GetHeights(x - AOExMod, z - AOEzMod, areaSize + AOExMod - AOExMod1, areaSize + AOEzMod - AOEzMod1); 
+            terrainHeightMap = GetCurrentTerrainHeightMap();
         }
         
         switch (effectType)
@@ -382,7 +390,7 @@ public class TerrainPainter : BezierSpline
                 PaintMap(x, z, AOExMod, AOEzMod, AOExMod1, AOEzMod1);
                 break;
             case EffectType.heightSnap:
-                ModifyHeight(x, z, y, AOExMod, AOEzMod, AOExMod1, AOEzMod1);
+                //ModifyHeight(x, z, y, AOExMod, AOEzMod, AOExMod1, AOEzMod1);
                 break;
         }
     }
@@ -390,11 +398,11 @@ public class TerrainPainter : BezierSpline
     //Raise Terrain
     void RaiseMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
     {
-        for (int xx = 0; xx < areaOfEffectSize + AOEzMod - AOEzMod1; xx++)
+        for (int xx = 0; xx < heightAdjustmentArea + AOEzMod - AOEzMod1; xx++)
         {
-            for (int yy = 0; yy < areaOfEffectSize + AOExMod - AOExMod1; yy++)
+            for (int yy = 0; yy < heightAdjustmentArea + AOExMod - AOExMod1; yy++)
             {
-                heights[xx, yy] += brush[xx - AOEzMod, yy - AOExMod] * strength; //for each point we raise the value  by the value of brush at the coords * the strength modifier
+                heights[xx, yy] += heightBrush[xx - AOEzMod, yy - AOExMod] * heightStrength; //for each point we raise the value  by the value of brush at the coords * the strength modifier
             }
         }
         terrain.terrainData.SetHeights(x - AOExMod, z - AOEzMod, heights); // This bit of code will save the change to the Terrain data file, this means that the changes will persist out of play mode into the edit mode
@@ -403,11 +411,11 @@ public class TerrainPainter : BezierSpline
     //Lower Terrain, just the reverse of raise terrain
     void LowerMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
     {
-        for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
+        for (int xx = 0; xx < heightAdjustmentArea + AOEzMod; xx++)
         {
-            for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
+            for (int yy = 0; yy < heightAdjustmentArea + AOExMod; yy++)
             {
-                heights[xx, yy] -= brush[xx - AOEzMod, yy - AOExMod] * strength;
+                heights[xx, yy] -= heightBrush[xx - AOEzMod, yy - AOExMod] * heightStrength;
             }
         }
         terrain.terrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
@@ -416,11 +424,11 @@ public class TerrainPainter : BezierSpline
     //this moves the current value towards our target value to flatten terrain
     void FlattenMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
     {
-        for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
+        for (int xx = 0; xx < heightAdjustmentArea + AOEzMod; xx++)
         {
-            for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
+            for (int yy = 0; yy < heightAdjustmentArea + AOExMod; yy++)
             {
-                heights[xx, yy] = Mathf.MoveTowards(heights[xx, yy], flattenHeight / 600, brush[xx - AOEzMod, yy - AOExMod] * strength);
+                heights[xx, yy] = Mathf.MoveTowards(heights[xx, yy], flattenHeight / 600, heightBrush[xx - AOEzMod, yy - AOExMod] * heightStrength);
             }
         }
         terrain.terrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
@@ -430,20 +438,22 @@ public class TerrainPainter : BezierSpline
     void SmoothMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
     {
         float[,] heightAvg = new float[heights.GetLength(0), heights.GetLength(1)];
-        for (int xx = 0; xx < areaOfEffectSize + AOEzMod; xx++)
+        GetSurroundingHeights(heights, x, z );
+        for (int xx = 0; xx < heightAdjustmentArea + AOEzMod; xx++)
         {
-            for (int yy = 0; yy < areaOfEffectSize + AOExMod; yy++)
+            for (int yy = 0; yy < heightAdjustmentArea + AOExMod; yy++)
             {
-                heightAvg[xx, yy] = GetSurroundingHeights(heights, xx, yy); // calculates the value we want each point to move towards
+                //heightAvg[xx, yy] = GetSurroundingHeights(heights, xx, yy); // calculates the value we want each point to move towards
+                //heights[xx, yy] = GetSurroundingHeights(heights, x + xx, z + yy);
             }
         }
-        for (int xx1 = 0; xx1 < areaOfEffectSize + AOEzMod; xx1++)
+        /*for (int xx1 = 0; xx1 < heightAdjustmentArea + AOEzMod; xx1++)
         {
-            for (int yy1 = 0; yy1 < areaOfEffectSize + AOExMod; yy1++)
+            for (int yy1 = 0; yy1 < heightAdjustmentArea + AOExMod; yy1++)
             {
-                heights[xx1, yy1] = Mathf.MoveTowards(heights[xx1, yy1], heightAvg[xx1, yy1], brush[xx1 - AOEzMod, yy1 - AOExMod] * strength); // moves the points towards their targets
+                heights[xx1, yy1] = Mathf.MoveTowards(heights[xx1, yy1], heightAvg[xx1, yy1], heightBrush[xx1 - AOEzMod, yy1 - AOExMod] * heightStrength); // moves the points towards their targets
             }
-        }
+        }*/
         terrain.terrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
     }
 
@@ -460,7 +470,7 @@ public class TerrainPainter : BezierSpline
                 {
                     weights[zz] = splat[xx, yy, zz];//grabs the weights from the terrains splat map
                 }
-                weights[paint] += brush[xx - AOEzMod, yy - AOExMod] * strength * 2000; // adds weight to the paint currently selected with the int paint variable
+                weights[paint] += paintBrush[xx - AOEzMod, yy - AOExMod] * paintStrength * 2000; // adds weight to the paint currently selected with the int paint variable
                                                                                        //this next bit normalizes all the weights so that they will add up to 1
                 float sum = GetSumOfFloats(weights);
                 for (int ww = 0; ww < weights.Length; ww++)
@@ -481,10 +491,50 @@ public class TerrainPainter : BezierSpline
     /// <param name="x"></param>
     /// <param name="z"></param>
     /// <param name="y"></param>
-    public void ModifyHeight(int x, int z, float y, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
+    public void ModifyHeight(int x, int z, float y)
     {
-        heights[x, z] = y;
-        terrain.terrainData.SetHeights(0, 0, heights);
+        //These AreaOfEffectModifier variables below will help us if we are modifying terrain that goes over the edge,
+        //you will see in a bit that I use Xmod for the the z(or Y) values, which was because I did not realize at first
+        //that the terrain X and world X is not the same so I had to flip them around and was too lazy to correct the names, so don't get thrown off by that.
+        int AOExMod = 0;
+        int AOEzMod = 0;
+        int AOExMod1 = 0;
+        int AOEzMod1 = 0;
+        if (x < 0) // if the brush goes off the negative end of the x axis we set the mod == to it to offset the edited area
+        {
+            AOExMod = x;
+        }
+        else if (x + heightAdjustmentArea > terrainHeightMapWidth)// if the brush goes off the posative end of the x axis we set the mod == to this
+        {
+            AOExMod1 = x + heightAdjustmentArea - terrainHeightMapWidth;
+        }
+
+        if (z < 0)//same as with x
+        {
+            AOEzMod = z;
+        }
+        else if (z + heightAdjustmentArea > terrainHeightMapHeight)
+        {
+            AOEzMod1 = z + heightAdjustmentArea - terrainHeightMapHeight;
+        }
+        int width = heightAdjustmentArea + AOEzMod - AOEzMod1;
+        int height = heightAdjustmentArea + AOExMod - AOExMod1;
+        heights = terrain.terrainData.GetHeights(x - AOExMod, z - AOEzMod, height, width);
+
+        // adjusts heights in area
+        for (int xx = 0; xx < width; xx++)
+        {
+            for (int yy = 0; yy < height; yy++)
+            {
+                float dist = Mathf.Sqrt((Mathf.Abs(xx - width / 2) * Mathf.Abs(xx - width / 2)) + (Mathf.Abs(yy - height / 2) * Mathf.Abs(yy - height / 2)));
+                float distRatio = dist / Mathf.Sqrt((width / 2) * (width / 2) + (height / 2) * (height / 2));
+                float yRatio = y - y * distRatio * heightAdjustmentSlope;
+                heights[xx, yy] = yRatio; //for each point we raise the value  by the value of brush at the coords * the strength modifier
+            }
+        }
+
+        //heights[x, z] = y;
+        terrain.terrainData.SetHeights(x - AOExMod, z - AOEzMod, heights);
     }
 
     public void StartPainting()

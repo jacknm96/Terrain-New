@@ -25,8 +25,9 @@ public class TerrainPainterInspector : Editor
 	int stepSizePerCurve;
 	int layerPaint;
 
-	float heightArea;
+	int heightArea;
 	float heightSlope;
+	float smoothStrength;
 
 	//for handlemode settings
 	private static Color[] modeColors = {
@@ -109,15 +110,40 @@ public class TerrainPainterInspector : Editor
 	{
 		GUILayout.Label("Selected Point");
 
-		EditorGUI.BeginChangeCheck(); 
+		EditorGUI.BeginChangeCheck();
 		//set the position of the selected point
-		Vector3 point = EditorGUILayout.Vector3Field("Position", painter.GetControlPoint(selectedIndex));
+		int mod = selectedIndex % 3;
+		int index = selectedIndex - mod;
+		Vector3[] controlPoints = new Vector3[4];
+		for (int i = index; i < index + 4; i++)
+		{
+			controlPoints[i - index] = painter.GetControlPoint(i);
+		}
+		Vector3 handlePoint1 = painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3));
+		Vector3 handlePoint2 = painter.GetPoint((index + 2) / (float)(painter.CurveCount * 3));
+		Vector3[] handlePoints = { controlPoints[0], handlePoint1, handlePoint2, controlPoints[3] }; // points that are shown to use, along curve
+		Vector3 point = EditorGUILayout.Vector3Field("Position", handlePoints[selectedIndex - index]);
 
 		if (EditorGUI.EndChangeCheck())
 		{
 			Undo.RecordObject(painter, "Move Point");
+            if (mod != 0)
+            {
+                handlePoints[mod] = point;
+                if (CalculateBezierControlPoints(controlPoints[0], handlePoints[1], handlePoints[2], controlPoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
+                {
+                    painter.SetControlPoint(index + 1, controlPoints[1]);
+                    painter.SetControlPoint(index + 2, controlPoints[2]);
+                }
+            }
+            else painter.SetControlPoint(selectedIndex, point); //set the selected index
+            //painter.SetControlPoint(selectedIndex, point); //set the selected index
+            if (painting) // if painting, realign paints with modified bezier curve
+			{
+				painter.UndoPaint();
+				PaintAlongBezier();
+			}
 			EditorUtility.SetDirty(painter);
-			painter.SetControlPoint(selectedIndex, point); //set the selected index
 		}
 
 		EditorGUI.BeginChangeCheck();  //set the mode of the selected point
@@ -175,12 +201,12 @@ public class TerrainPainterInspector : Editor
 
 			// set brush strength
 			EditorGUI.BeginChangeCheck();
-			brushStrength = EditorGUILayout.Slider(new GUIContent("Brush Strength", "Opacity"), painter.strength, 0.0f, 1.0f);
+			brushStrength = EditorGUILayout.Slider(new GUIContent("Brush Strength", "Opacity"), painter.paintStrength, 0.0f, 1.0f);
 			if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 			{
 				Undo.RecordObject(painter, "Change Brush Strength");
 				brushStrength = Mathf.Clamp01(brushStrength);
-				painter.strength = brushStrength;
+				painter.paintStrength = brushStrength;
 				if (painting)
 				{
 					painter.UndoPaint();
@@ -197,7 +223,7 @@ public class TerrainPainterInspector : Editor
 			{
 				Undo.RecordObject(painter, "Change Brush Texture");
 				painter.brushIMG = (Texture2D)brush.objectReferenceValue;
-				painter.SetBrush();
+				//painter.SetBrush();
 				painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
 				if (painting)
 				{
@@ -255,12 +281,13 @@ public class TerrainPainterInspector : Editor
 
 				// set height adjustment area
 				EditorGUI.BeginChangeCheck();
-				heightArea = EditorGUILayout.FloatField(new GUIContent("Heightmap Brush Size", "Area to be adjusted by height alignment"), painter.heightAdjustmentArea);
+				heightArea = EditorGUILayout.IntField(new GUIContent("Brush Size", "Area to be adjusted by height alignment"), painter.heightAdjustmentArea);
 				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 				{
 					Undo.RecordObject(painter, "Change Height Area");
 					heightArea = Mathf.Max(heightArea, 1);
 					painter.heightAdjustmentArea = heightArea;
+					painter.GenerateBrush(painter.brushIMG, painter.heightAdjustmentArea, true);
 					if (painting)
 					{
 						painter.UndoPaint();
@@ -271,12 +298,28 @@ public class TerrainPainterInspector : Editor
 
 				// set height adjustment slope
 				EditorGUI.BeginChangeCheck();
-				heightSlope = EditorGUILayout.Slider(new GUIContent("Heightmap Brush Slope", "Value of 0 will be completely flat, 1 is a sheer cliff"), painter.heightAdjustmentSlope, 0.0f, 1.0f);
+				heightSlope = EditorGUILayout.Slider(new GUIContent("Brush Slope", "Value of 0 will be completely flat, 1 is a sheer cliff"), painter.heightAdjustmentSlope, 0.0f, 1.0f);
 				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 				{
-					Undo.RecordObject(painter, "Change Brush Strength");
+					Undo.RecordObject(painter, "Change Height Slope");
 					heightSlope = Mathf.Clamp01(heightSlope);
 					painter.heightAdjustmentSlope = heightSlope;
+					if (painting)
+					{
+						painter.UndoPaint();
+						PaintAlongBezier();
+					}
+					EditorUtility.SetDirty(painter);
+				}
+
+				// set height smoothing strength
+				EditorGUI.BeginChangeCheck();
+				smoothStrength = EditorGUILayout.Slider(new GUIContent("Smoothing", "Value of 0 will have no smoothing"), painter.heightStrength, 0.0f, 100.0f);
+				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+				{
+					Undo.RecordObject(painter, "Change Smoothing");
+					smoothStrength = Mathf.Clamp(smoothStrength, 0f, 100f);
+					painter.heightStrength = smoothStrength;
 					if (painting)
 					{
 						painter.UndoPaint();
@@ -305,6 +348,7 @@ public class TerrainPainterInspector : Editor
 			{
 				painter.StartPainting(); // cache paint values when start painting for reverting
 				painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
+				if (alignHeight) painter.GenerateBrush(painter.brushIMG, painter.heightAdjustmentArea, true);
 				PaintAlongBezier();
 			}
 			else
@@ -427,8 +471,8 @@ public class TerrainPainterInspector : Editor
         {
 			controlPoints[i - index] = handleTransform.TransformPoint(painter.GetControlPoint(i));
 		}
-		Vector3 handlePoint1 = handleTransform.TransformPoint(painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3)));
-		Vector3 handlePoint2 = handleTransform.TransformPoint(painter.GetPoint((index + 2) / (float)(painter.CurveCount * 3)));
+		Vector3 handlePoint1 = painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3));
+		Vector3 handlePoint2 = painter.GetPoint((index + 2) / (float)(painter.CurveCount * 3));
 		Vector3[] handlePoints = {controlPoints[0], handlePoint1, handlePoint2, controlPoints[3] }; // points that are shown to use, along curve
 		for (int i = 0; i < handlePoints.Length; i++)
         {
@@ -480,11 +524,12 @@ public class TerrainPainterInspector : Editor
 		Ray ray;
 		RaycastHit hit;
 		int steps = stepSizePerCurve * painter.CurveCount;
+		List<Vector2> hits = new List<Vector2>(); // to reuse for smoothing rather than recasting 
 		for (int i = 0; i <= steps; i++)
 		{
 			point = painter.GetPoint(i / (float)steps);
 			ray = new Ray(point + Vector3.up, Vector3.down);
-			if (Physics.Raycast(ray, out hit))
+			if (Physics.Raycast(ray, out hit)) // check if point on bezier actually above terrain
 			{
 				painter.terrain = painter.GetTerrainAtObject(hit.transform.gameObject);
 				painter.SetEditValues(painter.terrain);
@@ -495,12 +540,21 @@ public class TerrainPainterInspector : Editor
                 {
 					//painter.SetHeights();
 					float y = painter.GetTerrainHeight(point.y);
+					hits.Add(new Vector2(terX, terZ));
 					//painter.ModifyHeight(terZ, terX, y);
-					painter.effectType = TerrainPainter.EffectType.heightSnap;
-					painter.ModifyTerrain(Mathf.Max(0, terX - (int)heightArea / 2), Mathf.Max(0, terZ - (int)heightArea / 2), y);
+					//painter.effectType = TerrainPainter.EffectType.heightSnap;
+					painter.ModifyHeight(Mathf.Max(0, terX - heightArea / 2), Mathf.Max(0, terZ - heightArea / 2), y);
                 }
 			}
 		}
+		/*if (alignHeight) // smooth
+        {
+			foreach (Vector2 step in hits)
+            {
+				painter.effectType = TerrainPainter.EffectType.smooth;
+				painter.ModifyTerrain(Mathf.Max(0, (int)step.x - heightArea / 2), Mathf.Max(0, (int)step.y - heightArea / 2));
+            }
+        }*/
 	}
 
 	bool CalculateBezierControlPoints(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float u, float v, ref Vector3 control1, ref Vector3 control2)
