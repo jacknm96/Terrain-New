@@ -117,8 +117,12 @@ public class TerrainPainterInspector : Editor
 		Vector3[] controlPoints = new Vector3[4];
 		for (int i = index; i < index + 4; i++)
 		{
-			controlPoints[i - index] = painter.GetControlPoint(i);
-		}
+            try { controlPoints[i - index] = painter.GetControlPoint(i); }
+            catch (System.Exception) // for if the selected index is the final point
+            {
+                //Debug.Log(i - index);
+            }
+        }
 		Vector3 handlePoint1 = painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3));
 		Vector3 handlePoint2 = painter.GetPoint((index + 2) / (float)(painter.CurveCount * 3));
 		Vector3[] handlePoints = { controlPoints[0], handlePoint1, handlePoint2, controlPoints[3] }; // points that are shown to use, along curve
@@ -494,16 +498,17 @@ public class TerrainPainterInspector : Editor
 			{
 				EditorGUI.BeginChangeCheck();
 				handlePoints[i] = Handles.DoPositionHandle(handlePoints[i], handleRotation);
+				//if (i == index + 1 || i == index + 2) handlePoints[i] = handleTransform.InverseTransformPoint(handlePoints[i]);
 				if (EditorGUI.EndChangeCheck())
 				{
 					Undo.RecordObject(painter, "Move Point");
 					//painter.SetControlPoint(index, handleTransform.InverseTransformPoint(handlePoints[i]));
 
 					// if index % 3 == 0, we are at root point and no difference between handle and control point
-					if (selectedIndex % 3 != 0 && CalculateBezierControlPoints(controlPoints[0], handlePoints[1], handlePoints[2], controlPoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
+					if (selectedIndex % 3 != 0 && CalculateBezierControlPoints(handlePoints[0], handlePoints[1], handlePoints[2], handlePoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
 					{
-						painter.SetControlPoint(index + 1, controlPoints[1]);
-						painter.SetControlPoint(index + 2, controlPoints[2]);
+						painter.SetControlPoint(index + 1, handleTransform.InverseTransformPoint(controlPoints[1]));
+						painter.SetControlPoint(index + 2, handleTransform.InverseTransformPoint(controlPoints[2]));
 					} else painter.SetControlPoint(index + i, handleTransform.InverseTransformPoint(handlePoints[i]));
 					if (painting) // if painting, realign paints with modified bezier curve
 					{
