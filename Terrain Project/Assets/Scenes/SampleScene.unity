@@ -332,9 +332,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   points:
   - {x: 158.94012, y: 0, z: 34.03427}
-  - {x: 330.3009, y: 0, z: 41.929836}
-  - {x: 468.3262, y: 0, z: 182.44496}
-  - {x: 482.56104, y: 0, z: 94.76467}
+  - {x: 330.3009, y: -0.000011444093, z: 41.929806}
+  - {x: 522.42303, y: 0.000022888184, z: 163.97667}
+  - {x: 536.65784, y: 0, z: 76.29632}
   modes: 0000000000000000
   loop: 0
   terrain: {fileID: 1715535115}
@@ -343,11 +343,11 @@ MonoBehaviour:
   paintStrength: 1
   heightStrength: 0
   flattenHeight: 5
-  effectType: 4
+  effectType: 3
   paints: {fileID: 8574412962073106934, guid: 950288b0204552e48afc891864dd7813, type: 2}
   paint: 1
   stepsPerCurve: 9
-  snapHeight: 0
+  snapHeight: 1
   painting: 0
   heightAdjustmentArea: 37
   heightAdjustmentSlope: 0

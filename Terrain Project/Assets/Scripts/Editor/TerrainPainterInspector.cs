@@ -552,15 +552,15 @@ public class TerrainPainterInspector : Editor
                 }
 			}
 		}
-		/*if (alignHeight) // smooth
+        if (alignHeight) // smooth
         {
-			foreach (Vector2 step in hits)
+            painter.effectType = TerrainPainter.EffectType.smooth;
+            foreach (Vector2 step in hits)
             {
-				painter.effectType = TerrainPainter.EffectType.smooth;
-				painter.ModifyTerrain(Mathf.Max(0, (int)step.x - heightArea / 2), Mathf.Max(0, (int)step.y - heightArea / 2));
+                painter.ModifyTerrain(Mathf.Max(0, (int)step.x - heightArea / 2), Mathf.Max(0, (int)step.y - heightArea / 2));
             }
-        }*/
-	}
+        }
+    }
 
 	bool CalculateBezierControlPoints(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float u, float v, ref Vector3 control1, ref Vector3 control2)
 	{
