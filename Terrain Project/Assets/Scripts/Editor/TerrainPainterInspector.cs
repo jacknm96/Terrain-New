@@ -470,6 +470,7 @@ public class TerrainPainterInspector : Editor
 		for (int i = index; i < index + 4; i++)
         {
 			controlPoints[i - index] = handleTransform.TransformPoint(painter.GetControlPoint(i));
+			//controlPoints[i - index] = painter.GetControlPoint(i);
 		}
 		Vector3 handlePoint1 = painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3));
 		Vector3 handlePoint2 = painter.GetPoint((index + 2) / (float)(painter.CurveCount * 3));
@@ -504,6 +505,7 @@ public class TerrainPainterInspector : Editor
 					{
 						painter.SetControlPoint(index + 1, controlPoints[1]);
 						painter.SetControlPoint(index + 2, controlPoints[2]);
+						//handlePoints[i] = painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3));
 					} else painter.SetControlPoint(index + i, handleTransform.InverseTransformPoint(handlePoints[i]));
 					if (painting) // if painting, realign paints with modified bezier curve
 					{
