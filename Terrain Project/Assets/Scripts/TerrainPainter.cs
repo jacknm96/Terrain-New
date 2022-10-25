@@ -7,7 +7,7 @@ public class TerrainPainter : BezierSpline
 {
     #region Painting
     public Terrain terrain;
-    TerrainData terrainData;
+    TerrainData currentTerrainData;
 
     float[,] terrainHeightMap;  //a 2d array of floats to store 
     int terrainHeightMapWidth; //Used to calculate click position
@@ -55,7 +55,7 @@ public class TerrainPainter : BezierSpline
         GenerateBrush(brushIMG, heightAdjustmentArea, true);
         effectType = EffectType.paint;
         terrain = FindObjectOfType<Terrain>();
-        terrainData = terrain.terrainData;
+        currentTerrainData = terrain.terrainData;
     }
 
     // Update is called once per frame
@@ -97,7 +97,7 @@ public class TerrainPainter : BezierSpline
     /// <param name="terrain"></param>
     public void SetEditValues(Terrain terrain)
     {
-        terrainData = GetCurrentTerrainData();
+        currentTerrainData = GetCurrentTerrainData();
         terrainHeightMap = GetCurrentTerrainHeightMap();
         terrainHeightMapWidth = GetCurrentTerrainWidth();
         terrainHeightMapHeight = GetCurrentTerrainHeight();
@@ -171,7 +171,7 @@ public class TerrainPainter : BezierSpline
     /// <returns></returns>
     public Vector3 GetTerrainSize()
     {
-        return terrainData.size;
+        return currentTerrainData.size;
     }
 
     /// <summary>
@@ -197,8 +197,8 @@ public class TerrainPainter : BezierSpline
             // the first 2 0's indicate the coords where we start, the next values indicate how far we extend the area,
             // so what we are saying here is I want the heights starting at the Origin and extending the entire width and height of the terrain
             return terrain.terrainData.GetHeights(0, 0,
-            terrainData.heightmapResolution,
-            terrainData.heightmapResolution);
+            terrain.terrainData.heightmapResolution,
+            terrain.terrainData.heightmapResolution);
         }
         return default(float[,]);
     }
@@ -211,7 +211,7 @@ public class TerrainPainter : BezierSpline
     {
         if (terrain)
         {
-            return terrainData.heightmapResolution;
+            return currentTerrainData.heightmapResolution;
         }
         return 0;
     }
@@ -224,7 +224,7 @@ public class TerrainPainter : BezierSpline
     {
         if (terrain)
         {
-            return terrainData.heightmapResolution;
+            return currentTerrainData.heightmapResolution;
         }
         return 0;
         //test2.GetComponent<MeshRenderer>().material.mainTexture = texture;
@@ -237,7 +237,7 @@ public class TerrainPainter : BezierSpline
     /// <returns></returns>
     public float GetTerrainHeight(float yVal)
     {
-        var heightScale = 1.0f / terrainData.size.y;
+        var heightScale = 1.0f / currentTerrainData.size.y;
         return yVal * heightScale;
     }
 
@@ -438,13 +438,13 @@ public class TerrainPainter : BezierSpline
     void SmoothMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
     {
         float[,] heightAvg = new float[heights.GetLength(0), heights.GetLength(1)];
-        GetSurroundingHeights(heights, x, z );
-        for (int xx = 0; xx < heightAdjustmentArea + AOEzMod; xx++)
+        //GetSurroundingHeights(heights, x, z );
+        for (int xx = x; xx < heightAdjustmentArea + AOEzMod - AOExMod1; xx++)
         {
-            for (int yy = 0; yy < heightAdjustmentArea + AOExMod; yy++)
+            for (int yy = z; yy < heightAdjustmentArea + AOExMod - AOExMod1; yy++)
             {
                 //heightAvg[xx, yy] = GetSurroundingHeights(heights, xx, yy); // calculates the value we want each point to move towards
-                //heights[xx, yy] = GetSurroundingHeights(heights, x + xx, z + yy);
+                heights[xx, yy] = GetSurroundingHeights(heights, xx, yy);
             }
         }
         /*for (int xx1 = 0; xx1 < heightAdjustmentArea + AOEzMod; xx1++)
@@ -560,6 +560,11 @@ public class TerrainPainter : BezierSpline
         undoHeightHolder = new float[0, 0];
         terrain.Flush();
         painting = false;
+    }
+
+    public void Flush()
+    {
+        terrain.Flush();
     }
 
     float GetSumOfFloats(float[] vals)

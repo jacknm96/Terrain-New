@@ -49,6 +49,7 @@ public class TerrainPainterInspector : Editor
 		so = serializedObject;
 		brush = so.FindProperty(nameof(TerrainPainter.brushIMG));
 		paint = so.FindProperty(nameof(TerrainPainter.paints));
+		Undo.undoRedoPerformed += OnUndo;
     }
 
     //when drawing the scene
@@ -131,7 +132,7 @@ public class TerrainPainterInspector : Editor
 		if (EditorGUI.EndChangeCheck())
 		{
 			Undo.RecordObject(painter, "Move Point");
-            if (mod != 0)
+			if (mod != 0)
             {
                 handlePoints[mod] = point;
                 if (CalculateBezierControlPoints(controlPoints[0], handlePoints[1], handlePoints[2], controlPoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
@@ -598,4 +599,12 @@ public class TerrainPainterInspector : Editor
 		return true; /* success */
 	}
 
+	void OnUndo()
+	{
+		if (painter != null)
+		{
+			painter.UndoPaint();
+			if (painter.painting) PaintAlongBezier();
+		}
+	}
 }
