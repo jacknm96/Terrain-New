@@ -14,9 +14,9 @@ public class TerrainPainterInspector : Editor
 	//[SerializeField] Texture2D brush;
 	SerializedObject so;
 	SerializedProperty brush;
-	SerializedProperty paint;
 	int brushSize;
 	float brushStrength;
+	bool terrainPaint;
 	bool alignHeight;
 	bool foldoutPaintingSettings = true;
 	bool foldoutHeightSettings = true;
@@ -48,7 +48,6 @@ public class TerrainPainterInspector : Editor
     {
 		so = serializedObject;
 		brush = so.FindProperty(nameof(TerrainPainter.brushIMG));
-		paint = so.FindProperty(nameof(TerrainPainter.paints));
 		Undo.undoRedoPerformed += OnUndo;
     }
 
@@ -85,7 +84,7 @@ public class TerrainPainterInspector : Editor
         }
 
 		//draws where along the curve brush will paint, and radius of brush
-		if (!painting)
+		if (!painting && (terrainPaint || alignHeight))
         {
 			Vector3 point;
 			int steps = stepSizePerCurve * painter.CurveCount;
@@ -94,8 +93,16 @@ public class TerrainPainterInspector : Editor
 				for (int i = 0; i <= steps; i++)
 				{
 					point = painter.GetPoint(i / (float)steps);
-					Handles.color = Color.white;
-					Handles.DrawWireDisc(point, Vector3.up, brushSize);
+					if (terrainPaint)
+                    {
+						Handles.color = Color.white;
+						Handles.DrawWireDisc(point, Vector3.up, brushSize);
+					}
+					if (alignHeight)
+                    {
+						Handles.color = Color.red;
+						Handles.DrawWireDisc(point, Vector3.up, heightArea);
+					}
 				}
 			}
 		}
@@ -146,7 +153,7 @@ public class TerrainPainterInspector : Editor
             if (painting) // if painting, realign paints with modified bezier curve
 			{
 				painter.UndoPaint();
-				PaintAlongBezier();
+				painter.PaintAlongBezier();
 			}
 			EditorUtility.SetDirty(painter);
 		}
@@ -178,83 +185,102 @@ public class TerrainPainterInspector : Editor
 			if (painting)
 			{
 				painter.UndoPaint();
-				PaintAlongBezier();
+				painter.PaintAlongBezier();
 			}
 			EditorUtility.SetDirty(painter);
 		}
 
-		foldoutPaintingSettings = EditorGUILayout.Foldout(foldoutPaintingSettings, "Paintbrush Settings");
-		if (foldoutPaintingSettings)
+		// align height toggle
+		EditorGUI.BeginChangeCheck();
+		terrainPaint = EditorGUILayout.Toggle("Paint Terrain", painter.terrainPaint);
+		if (EditorGUI.EndChangeCheck())
+		{
+			Undo.RecordObject(painter, "Paint toggle");
+			painter.terrainPaint = terrainPaint;
+			if (painting)
+			{
+				if (terrainPaint) painter.StartTerrainPaint();
+				else painter.UndoTerrainPaint();
+				painter.UndoPaint();
+				painter.PaintAlongBezier();
+			}
+			EditorUtility.SetDirty(painter);
+		}
+		if (terrainPaint)
         {
-			EditorGUI.indentLevel++;
-			// set brush size
-			EditorGUI.BeginChangeCheck();
-			brushSize = EditorGUILayout.IntField("Brush Size", painter.areaOfEffectSize);
-			if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+			foldoutPaintingSettings = EditorGUILayout.Foldout(foldoutPaintingSettings, "Paintbrush Settings");
+			if (foldoutPaintingSettings)
 			{
-				Undo.RecordObject(painter, "Change Brush Size");
-				brushSize = Mathf.Max(brushSize, 2);
-				painter.areaOfEffectSize = brushSize;
-				painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
-				if (painting)
+				EditorGUI.indentLevel++;
+				// set brush size
+				EditorGUI.BeginChangeCheck();
+				brushSize = EditorGUILayout.IntField("Brush Size", painter.areaOfEffectSize);
+				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 				{
-					painter.UndoPaint();
-					PaintAlongBezier();
+					Undo.RecordObject(painter, "Change Brush Size");
+					brushSize = Mathf.Max(brushSize, 2);
+					painter.areaOfEffectSize = brushSize;
+					painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
+					if (painting)
+					{
+						painter.UndoPaint();
+						painter.PaintAlongBezier();
+					}
+					EditorUtility.SetDirty(painter);
 				}
-				EditorUtility.SetDirty(painter);
-			}
 
-			// set brush strength
-			EditorGUI.BeginChangeCheck();
-			brushStrength = EditorGUILayout.Slider(new GUIContent("Brush Strength", "Opacity"), painter.paintStrength, 0.0f, 1.0f);
-			if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-			{
-				Undo.RecordObject(painter, "Change Brush Strength");
-				brushStrength = Mathf.Clamp01(brushStrength);
-				painter.paintStrength = brushStrength;
-				if (painting)
+				// set brush strength
+				EditorGUI.BeginChangeCheck();
+				brushStrength = EditorGUILayout.Slider(new GUIContent("Brush Strength", "Opacity"), painter.paintStrength, 0.0f, 1.0f);
+				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 				{
-					painter.UndoPaint();
-					PaintAlongBezier();
+					Undo.RecordObject(painter, "Change Brush Strength");
+					brushStrength = Mathf.Clamp01(brushStrength);
+					painter.paintStrength = brushStrength;
+					if (painting)
+					{
+						painter.UndoPaint();
+						painter.PaintAlongBezier();
+					}
+					EditorUtility.SetDirty(painter);
 				}
-				EditorUtility.SetDirty(painter);
-			}
 
-			// set brush img
-			EditorGUI.BeginChangeCheck();
-			//brush.objectReferenceValue = EditorGUILayout.ObjectField("Brush", brush.objectReferenceValue, typeof(Texture2D), false) as Texture2D;
-			EditorGUILayout.PropertyField(brush, new GUIContent("Brush Image", "Shape of the paint brush"));
-			if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-			{
-				Undo.RecordObject(painter, "Change Brush Texture");
-				painter.brushIMG = (Texture2D)brush.objectReferenceValue;
-				//painter.SetBrush();
-				painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
-				if (painting)
+				// set brush img
+				EditorGUI.BeginChangeCheck();
+				//brush.objectReferenceValue = EditorGUILayout.ObjectField("Brush", brush.objectReferenceValue, typeof(Texture2D), false) as Texture2D;
+				EditorGUILayout.PropertyField(brush, new GUIContent("Brush Image", "Shape of the paint brush"));
+				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 				{
-					painter.UndoPaint();
-					PaintAlongBezier();
+					Undo.RecordObject(painter, "Change Brush Texture");
+					painter.brushIMG = (Texture2D)brush.objectReferenceValue;
+					//painter.SetBrush();
+					painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
+					if (painting)
+					{
+						painter.UndoPaint();
+						painter.PaintAlongBezier();
+					}
+					EditorUtility.SetDirty(painter);
 				}
-				EditorUtility.SetDirty(painter);
-			}
 
-			// set paint texture
-			EditorGUI.BeginChangeCheck();
-			layerPaint = EditorGUILayout.IntField(new GUIContent("Paint Layer", "Index of the layer paint to use from the terrain component"), painter.paint);
-			if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-			{
-				Undo.RecordObject(painter, "Change Paint Layer");
-				layerPaint = Mathf.Max(layerPaint, 0);
-				painter.paint = layerPaint;
-				if (painting)
+				// set paint texture
+				EditorGUI.BeginChangeCheck();
+				layerPaint = EditorGUILayout.IntField(new GUIContent("Paint Layer", "Index of the layer paint to use from the terrain component"), painter.paint);
+				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 				{
-					painter.UndoPaint();
-					PaintAlongBezier();
+					Undo.RecordObject(painter, "Change Paint Layer");
+					layerPaint = Mathf.Max(layerPaint, 0);
+					painter.paint = layerPaint;
+					if (painting)
+					{
+						painter.UndoPaint();
+						painter.PaintAlongBezier();
+					}
+					EditorUtility.SetDirty(painter);
 				}
-				EditorUtility.SetDirty(painter);
+				EditorGUI.indentLevel--;
 			}
-			EditorGUI.indentLevel--;
-        }
+		}
 
 		EditorGUILayout.Space();
 
@@ -265,6 +291,13 @@ public class TerrainPainterInspector : Editor
         {
 			Undo.RecordObject(painter, "Height toggle");
 			painter.snapHeight = alignHeight;
+			if (painting)
+			{
+				if (alignHeight) painter.StartHeightAdjustment();
+				else painter.UndoHeightAdjustment();
+				painter.UndoPaint();
+				painter.PaintAlongBezier();
+			}
 			EditorUtility.SetDirty(painter);
         }
 		if (alignHeight)
@@ -296,7 +329,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						PaintAlongBezier();
+						painter.PaintAlongBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -312,7 +345,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						PaintAlongBezier();
+						painter.PaintAlongBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -328,7 +361,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						PaintAlongBezier();
+						painter.PaintAlongBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -354,7 +387,7 @@ public class TerrainPainterInspector : Editor
 				painter.StartPainting(); // cache paint values when start painting for reverting
 				painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
 				if (alignHeight) painter.GenerateBrush(painter.brushIMG, painter.heightAdjustmentArea, true);
-				PaintAlongBezier();
+				painter.PaintAlongBezier();
 			}
 			else
 			{
@@ -462,7 +495,7 @@ public class TerrainPainterInspector : Editor
 				if (painting) // if painting, realign paints with modified bezier curve
                 {
 					painter.UndoPaint();
-					PaintAlongBezier();
+					painter.PaintAlongBezier();
                 }
 			}
 		}
@@ -515,7 +548,7 @@ public class TerrainPainterInspector : Editor
 					if (painting) // if painting, realign paints with modified bezier curve
 					{
 						painter.UndoPaint();
-						PaintAlongBezier();
+						painter.PaintAlongBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -524,45 +557,7 @@ public class TerrainPainterInspector : Editor
 		return controlPoints;
     }
 
-	// steps through the bezier spline, every step casting to the terrain and painting at that location
-	void PaintAlongBezier()
-    {
-		Vector3 point;
-		Ray ray;
-		RaycastHit hit;
-		int steps = stepSizePerCurve * painter.CurveCount;
-		List<Vector2> hits = new List<Vector2>(); // to reuse for smoothing rather than recasting 
-		for (int i = 0; i <= steps; i++)
-		{
-			point = painter.GetPoint(i / (float)steps);
-			ray = new Ray(point + Vector3.up, Vector3.down);
-			if (Physics.Raycast(ray, out hit)) // check if point on bezier actually above terrain
-			{
-				painter.terrain = painter.GetTerrainAtObject(hit.transform.gameObject);
-				painter.SetEditValues(painter.terrain);
-				painter.GetTerrainCoordinates(hit, out int terX, out int terZ);
-				painter.effectType = TerrainPainter.EffectType.paint;
-				painter.ModifyTerrain(Mathf.Max(0, terX - brushSize / 2), Mathf.Max(0, terZ - brushSize / 2));
-				if (alignHeight)
-                {
-					//painter.SetHeights();
-					float y = painter.GetTerrainHeight(point.y);
-					hits.Add(new Vector2(terX, terZ));
-					//painter.ModifyHeight(terZ, terX, y);
-					//painter.effectType = TerrainPainter.EffectType.heightSnap;
-					painter.ModifyHeight(Mathf.Max(0, terX - heightArea / 2), Mathf.Max(0, terZ - heightArea / 2), y);
-                }
-			}
-		}
-        if (alignHeight) // smooth
-        {
-            painter.effectType = TerrainPainter.EffectType.smooth;
-            foreach (Vector2 step in hits)
-            {
-                painter.ModifyTerrain(Mathf.Max(0, (int)step.x - heightArea / 2), Mathf.Max(0, (int)step.y - heightArea / 2));
-            }
-        }
-    }
+	
 
 	bool CalculateBezierControlPoints(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float u, float v, ref Vector3 control1, ref Vector3 control2)
 	{
@@ -604,7 +599,7 @@ public class TerrainPainterInspector : Editor
 		if (painter != null)
 		{
 			painter.UndoPaint();
-			if (painter.painting) PaintAlongBezier();
+			if (painter.painting) painter.PaintAlongBezier();
 		}
 	}
 }

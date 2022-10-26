@@ -39,6 +39,7 @@ public class TerrainPainter : BezierSpline
     float[,,] splat; // A splat map is what unity uses to overlay all of your paints on to the terrain
     float[,,] undoSplatHolder = new float[0, 0, 0]; // holds splat map information from when we started editing for the purpose of reverting changes
     public int stepsPerCurve;
+    public bool terrainPaint;
     public bool snapHeight;
     public bool painting;
 
@@ -438,13 +439,19 @@ public class TerrainPainter : BezierSpline
     void SmoothMap(int x, int z, int AOExMod = 0, int AOEzMod = 0, int AOExMod1 = 0, int AOEzMod1 = 0)
     {
         float[,] heightAvg = new float[heights.GetLength(0), heights.GetLength(1)];
+        int width = heightAdjustmentArea + AOEzMod - AOExMod1;
+        int height = heightAdjustmentArea + AOExMod - AOExMod1;
+        Vector2 mid = new Vector2(x + width / 2, z + height / 2);
         //GetSurroundingHeights(heights, x, z );
-        for (int xx = x; xx < heightAdjustmentArea + AOEzMod - AOExMod1; xx++)
+        for (int xx = x; xx < width; xx++)
         {
-            for (int yy = z; yy < heightAdjustmentArea + AOExMod - AOExMod1; yy++)
+            for (int yy = z; yy < height; yy++)
             {
                 //heightAvg[xx, yy] = GetSurroundingHeights(heights, xx, yy); // calculates the value we want each point to move towards
-                heights[xx, yy] = GetSurroundingHeights(heights, xx, yy);
+                float dist = Vector2.Distance(mid, new Vector2(xx, yy));
+                float distRatio = dist / Mathf.Sqrt((width / 2) * (width / 2) + (height / 2) * (height / 2));
+                float h = heights[xx, yy];
+                heights[xx, yy] = h - (h - GetSurroundingHeights(heights, xx, yy)) * distRatio;
             }
         }
         /*for (int xx1 = 0; xx1 < heightAdjustmentArea + AOEzMod; xx1++)
@@ -521,15 +528,26 @@ public class TerrainPainter : BezierSpline
         int height = heightAdjustmentArea + AOExMod - AOExMod1;
         heights = terrain.terrainData.GetHeights(x - AOExMod, z - AOEzMod, height, width);
 
+        bool raising = y > undoHeightHolder[x, z];
+
         // adjusts heights in area
         for (int xx = 0; xx < width; xx++)
         {
             for (int yy = 0; yy < height; yy++)
             {
+                float h = heights[xx, yy];
+                float diff = y - h;
                 float dist = Mathf.Sqrt((Mathf.Abs(xx - width / 2) * Mathf.Abs(xx - width / 2)) + (Mathf.Abs(yy - height / 2) * Mathf.Abs(yy - height / 2)));
                 float distRatio = dist / Mathf.Sqrt((width / 2) * (width / 2) + (height / 2) * (height / 2));
-                float yRatio = y - y * distRatio * heightAdjustmentSlope;
-                heights[xx, yy] = yRatio; //for each point we raise the value  by the value of brush at the coords * the strength modifier
+                float yRatio = y - (diff * distRatio * heightAdjustmentSlope);
+                if (raising)
+                {
+                    heights[xx, yy] = Mathf.Max(yRatio, h); // use higher height so we don't override previous height raise with lower
+                } else
+                {
+                    heights[xx, yy] = Mathf.Min(yRatio, h); // use lower height so we don't override previous height lower with raise
+                }
+                //heights[xx, yy] = yRatio; //for each point we raise the value  by the value of brush at the coords * the strength modifier
             }
         }
 
@@ -539,19 +557,36 @@ public class TerrainPainter : BezierSpline
 
     public void StartPainting()
     {
-        undoSplatHolder = terrain.terrainData.GetAlphamaps(0, 0, terrain.terrainData.alphamapWidth, terrain.terrainData.alphamapHeight);
-        if (snapHeight) undoHeightHolder = GetCurrentTerrainHeightMap();
+        if (terrainPaint) StartTerrainPaint();
+        if (snapHeight) StartHeightAdjustment();
         painting = true;
+    }
+
+    public void StartTerrainPaint()
+    {
+        undoSplatHolder = terrain.terrainData.GetAlphamaps(0, 0, terrain.terrainData.alphamapWidth, terrain.terrainData.alphamapHeight);
+    }
+
+    public void UndoTerrainPaint()
+    {
+        terrain.terrainData.SetAlphamaps(0, 0, undoSplatHolder);
+    }
+    
+    public void StartHeightAdjustment()
+    {
+        undoHeightHolder = GetCurrentTerrainHeightMap();
+    }
+
+    public void UndoHeightAdjustment()
+    {
+        terrain.terrainData.SetHeights(0, 0, undoHeightHolder);
     }
 
     public void UndoPaint()
     {
-        if (undoSplatHolder.Length > 0)
-        {
-            terrain.terrainData.SetAlphamaps(0, 0, undoSplatHolder);
-            if (snapHeight) terrain.terrainData.SetHeights(0, 0, undoHeightHolder);
-            terrain.Flush();
-        }
+        if (undoSplatHolder.Length > 0) UndoTerrainPaint();
+        if (undoHeightHolder.Length > 0) UndoHeightAdjustment();
+        terrain.Flush();
     }
 
     public void Bake()
@@ -562,9 +597,44 @@ public class TerrainPainter : BezierSpline
         painting = false;
     }
 
-    public void Flush()
+    // steps through the bezier spline, every step casting to the terrain and painting at that location
+    public void PaintAlongBezier()
     {
-        terrain.Flush();
+        Vector3 point;
+        Ray ray;
+        RaycastHit hit;
+        int steps = stepsPerCurve * CurveCount;
+        List<Vector2> hits = new List<Vector2>(); // to reuse for smoothing rather than recasting 
+        for (int i = 0; i <= steps; i++)
+        {
+            point = GetPoint(i / (float)steps);
+            ray = new Ray(point + Vector3.up * currentTerrainData.size.y, Vector3.down);
+            if (Physics.Raycast(ray, out hit)) // check if point on bezier actually above terrain
+            {
+                terrain = GetTerrainAtObject(hit.transform.gameObject);
+                SetEditValues(terrain);
+                GetTerrainCoordinates(hit, out int terX, out int terZ);
+                effectType = EffectType.paint;
+                if (terrainPaint) ModifyTerrain(Mathf.Max(0, terX - areaOfEffectSize / 2), Mathf.Max(0, terZ - areaOfEffectSize / 2));
+                if (snapHeight)
+                {
+                    //painter.SetHeights();
+                    float y = GetTerrainHeight(point.y);
+                    hits.Add(new Vector2(terX, terZ));
+                    //painter.ModifyHeight(terZ, terX, y);
+                    //painter.effectType = TerrainPainter.EffectType.heightSnap;
+                    ModifyHeight(Mathf.Max(0, terX - heightAdjustmentArea / 2), Mathf.Max(0, terZ - heightAdjustmentArea / 2), y);
+                }
+            }
+        }
+        if (snapHeight) // smooth
+        {
+            effectType = EffectType.smooth;
+            foreach (Vector2 step in hits)
+            {
+                ModifyTerrain(Mathf.Max(0, (int)step.x - heightAdjustmentArea / 2), Mathf.Max(0, (int)step.y - heightAdjustmentArea / 2));
+            }
+        }
     }
 
     float GetSumOfFloats(float[] vals)
