@@ -131,8 +131,8 @@ public class TerrainPainterInspector : Editor
                 //Debug.Log(i - index);
             }
         }
-		Vector3 handlePoint1 = painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3));
-		Vector3 handlePoint2 = painter.GetPoint((index + 2) / (float)(painter.CurveCount * 3));
+		Vector3 handlePoint1 = handleTransform.InverseTransformPoint(painter.GetPoint((index + 1) / (float)(painter.CurveCount * 3)));
+		Vector3 handlePoint2 = handleTransform.InverseTransformPoint(painter.GetPoint((index + 2) / (float)(painter.CurveCount * 3)));
 		Vector3[] handlePoints = { controlPoints[0], handlePoint1, handlePoint2, controlPoints[3] }; // points that are shown to use, along curve
 		Vector3 point = EditorGUILayout.Vector3Field("Position", handlePoints[selectedIndex - index]);
 
@@ -142,7 +142,7 @@ public class TerrainPainterInspector : Editor
 			if (mod != 0)
             {
                 handlePoints[mod] = point;
-                if (CalculateBezierControlPoints(controlPoints[0], handlePoints[1], handlePoints[2], controlPoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
+                if (CalculateBezierControlPoints(controlPoints[0], handleTransform.TransformPoint(handlePoints[1]), handleTransform.TransformPoint(handlePoints[2]), controlPoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
                 {
                     painter.SetControlPoint(index + 1, controlPoints[1]);
                     painter.SetControlPoint(index + 2, controlPoints[2]);
@@ -192,7 +192,7 @@ public class TerrainPainterInspector : Editor
 
 		// align height toggle
 		EditorGUI.BeginChangeCheck();
-		terrainPaint = EditorGUILayout.Toggle("Paint Terrain", painter.terrainPaint);
+		terrainPaint = EditorGUILayout.Toggle("Paint Texture", painter.terrainPaint);
 		if (EditorGUI.EndChangeCheck())
 		{
 			Undo.RecordObject(painter, "Paint toggle");
@@ -306,16 +306,6 @@ public class TerrainPainterInspector : Editor
 			if (foldoutHeightSettings)
 			{
 				EditorGUI.indentLevel++;
-
-				// set flatten height
-				EditorGUI.BeginChangeCheck();
-				flatten = EditorGUILayout.FloatField("Flatten Height", flatten);
-				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-				{
-					Undo.RecordObject(painter, "Change Flatten Strength");
-					painter.flattenHeight = flatten;
-					EditorUtility.SetDirty(painter);
-				}
 
 				// set height adjustment area
 				EditorGUI.BeginChangeCheck();
