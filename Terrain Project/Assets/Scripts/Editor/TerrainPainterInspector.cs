@@ -342,12 +342,12 @@ public class TerrainPainterInspector : Editor
 
 				// set height smoothing strength
 				EditorGUI.BeginChangeCheck();
-				smoothStrength = EditorGUILayout.Slider(new GUIContent("Smoothing", "Value of 0 will have no smoothing"), painter.heightStrength, 0.0f, 100.0f);
+				smoothStrength = EditorGUILayout.Slider(new GUIContent("Smoothing", "Value of 0 will have no smoothing"), painter.smoothStrength, 0.0f, 1.0f);
 				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 				{
 					Undo.RecordObject(painter, "Change Smoothing");
-					smoothStrength = Mathf.Clamp(smoothStrength, 0f, 100f);
-					painter.heightStrength = smoothStrength;
+					smoothStrength = Mathf.Clamp01(smoothStrength);
+					painter.smoothStrength = smoothStrength;
 					if (painting)
 					{
 						painter.UndoPaint();
