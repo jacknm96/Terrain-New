@@ -607,7 +607,7 @@ public class TerrainPainter : BezierSpline
         for (int i = 0; i <= steps; i++)
         {
             point = GetPoint(i / (float)steps);
-            ray = new Ray(point + Vector3.up * currentTerrainData.size.y, Vector3.down);
+            ray = new Ray(point + Vector3.up * terrain.terrainData.size.y, Vector3.down);
             if (Physics.Raycast(ray, out hit)) // check if point on bezier actually above terrain
             {
                 terrain = GetTerrainAtObject(hit.transform.gameObject);
@@ -626,14 +626,14 @@ public class TerrainPainter : BezierSpline
                 }
             }
         }
-        if (snapHeight) // smooth
+        /*if (snapHeight) // smooth
         {
             effectType = EffectType.smooth;
             foreach (Vector2 step in hits)
             {
                 ModifyTerrain(Mathf.Max(0, (int)step.x - heightAdjustmentArea / 2), Mathf.Max(0, (int)step.y - heightAdjustmentArea / 2));
             }
-        }
+        }*/
     }
 
     float GetSumOfFloats(float[] vals)

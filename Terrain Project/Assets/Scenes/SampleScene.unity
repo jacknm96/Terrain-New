@@ -341,7 +341,7 @@ MonoBehaviour:
   brushIMG: {fileID: 2800000, guid: 17405fba9d20b47408239b3e82d60232, type: 3}
   areaOfEffectSize: 15
   paintStrength: 1
-  heightStrength: 0
+  smoothStrength: 0
   flattenHeight: 5
   effectType: 3
   paints: {fileID: 8574412962073106934, guid: 950288b0204552e48afc891864dd7813, type: 2}
