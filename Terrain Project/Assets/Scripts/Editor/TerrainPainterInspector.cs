@@ -153,7 +153,7 @@ public class TerrainPainterInspector : Editor
             if (painting) // if painting, realign paints with modified bezier curve
 			{
 				painter.UndoPaint();
-				painter.PaintAlongBezier();
+				painter.PaintAlongProjectedBezier();
 			}
 			EditorUtility.SetDirty(painter);
 		}
@@ -185,7 +185,7 @@ public class TerrainPainterInspector : Editor
 			if (painting)
 			{
 				painter.UndoPaint();
-				painter.PaintAlongBezier();
+				painter.PaintAlongProjectedBezier();
 			}
 			EditorUtility.SetDirty(painter);
 		}
@@ -202,7 +202,7 @@ public class TerrainPainterInspector : Editor
 				if (terrainPaint) painter.StartTerrainPaint();
 				else painter.UndoTerrainPaint();
 				painter.UndoPaint();
-				painter.PaintAlongBezier();
+				painter.PaintAlongProjectedBezier();
 			}
 			EditorUtility.SetDirty(painter);
 		}
@@ -224,7 +224,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						painter.PaintAlongBezier();
+						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -240,7 +240,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						painter.PaintAlongBezier();
+						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -258,7 +258,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						painter.PaintAlongBezier();
+						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -274,7 +274,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						painter.PaintAlongBezier();
+						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -296,7 +296,7 @@ public class TerrainPainterInspector : Editor
 				if (alignHeight) painter.StartHeightAdjustment();
 				else painter.UndoHeightAdjustment();
 				painter.UndoPaint();
-				painter.PaintAlongBezier();
+				painter.PaintAlongProjectedBezier();
 			}
 			EditorUtility.SetDirty(painter);
         }
@@ -319,7 +319,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						painter.PaintAlongBezier();
+						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -335,7 +335,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						painter.PaintAlongBezier();
+						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -351,7 +351,7 @@ public class TerrainPainterInspector : Editor
 					if (painting)
 					{
 						painter.UndoPaint();
-						painter.PaintAlongBezier();
+						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -377,7 +377,7 @@ public class TerrainPainterInspector : Editor
 				painter.StartPainting(); // cache paint values when start painting for reverting
 				painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
 				if (alignHeight) painter.GenerateBrush(painter.brushIMG, painter.heightAdjustmentArea, true);
-				painter.PaintAlongBezier();
+				painter.PaintAlongProjectedBezier();
 			}
 			else
 			{
@@ -485,7 +485,7 @@ public class TerrainPainterInspector : Editor
 				if (painting) // if painting, realign paints with modified bezier curve
                 {
 					painter.UndoPaint();
-					painter.PaintAlongBezier();
+					painter.PaintAlongProjectedBezier();
                 }
 			}
 		}
@@ -538,7 +538,7 @@ public class TerrainPainterInspector : Editor
 					if (painting) // if painting, realign paints with modified bezier curve
 					{
 						painter.UndoPaint();
-						painter.PaintAlongBezier();
+						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
 				}
@@ -589,7 +589,7 @@ public class TerrainPainterInspector : Editor
 		if (painter != null)
 		{
 			painter.UndoPaint();
-			if (painter.painting) painter.PaintAlongBezier();
+			if (painter.painting) painter.PaintAlongProjectedBezier();
 		}
 	}
 }

@@ -48,6 +48,8 @@ public class TerrainPainter : BezierSpline
 
     Vector3 startPos;
     Vector3 endPos;
+
+    Vector3[] projectedPoints;
     
     // Start is called before the first frame update
     void Start()
@@ -128,6 +130,49 @@ public class TerrainPainter : BezierSpline
         //Finally, this will spit out the X Y values for use in other parts of the code
         x = (int)locationInTerrain.x;
         z = (int)locationInTerrain.z;
+    }
+
+    public Vector3 GetProjectedPoint(float t)
+    {
+        int i;
+        if (t >= 1f)
+        {
+            t = 1f;
+            i = projectedPoints.Length - 4;
+        }
+        else
+        {
+            t = Mathf.Clamp01(t) * CurveCount;
+            i = (int)t;
+            t -= i;
+            i *= 3;
+        }
+        //convert the local position of the point t in the bezier to world position
+        return Bezier.GetPoint(projectedPoints[i], projectedPoints[i + 1], projectedPoints[i + 2], projectedPoints[i + 3], t);
+    }
+
+    void GenerateProjectedCoords()
+    {
+        projectedPoints = new Vector3[points.Length];
+        for (int i = 0; i < points.Length; i++)
+        {
+            projectedPoints[i] = WorldToTerrainCoordinates(points[i], -transform.up);
+        }
+    }
+
+    /// <summary>
+    /// Takes in a worldpoint and a direction, projects that point along that direction onto the terrain
+    /// </summary>
+    /// <param name="worldPoint"></param>
+    /// <returns></returns>
+    public Vector3 WorldToTerrainCoordinates(Vector3 worldPoint, Vector3 direction)
+    {
+        if (Physics.Raycast(worldPoint, direction, out RaycastHit hit))
+        {
+            GetTerrainCoordinates(hit, out int x, out int z);
+            return new Vector3(x, 0, z);
+        }
+        return Vector3.negativeInfinity;
     }
 
     /// <summary>
@@ -623,6 +668,46 @@ public class TerrainPainter : BezierSpline
                     //painter.ModifyHeight(terZ, terX, y);
                     //painter.effectType = TerrainPainter.EffectType.heightSnap;
                     ModifyHeight(Mathf.Max(0, terX - heightAdjustmentArea / 2), Mathf.Max(0, terZ - heightAdjustmentArea / 2), y);
+                }
+            }
+        }
+        /*if (snapHeight) // smooth
+        {
+            effectType = EffectType.smooth;
+            foreach (Vector2 step in hits)
+            {
+                ModifyTerrain(Mathf.Max(0, (int)step.x - heightAdjustmentArea / 2), Mathf.Max(0, (int)step.y - heightAdjustmentArea / 2));
+            }
+        }*/
+    }
+
+    public void PaintAlongProjectedBezier()
+    {
+        GenerateProjectedCoords();
+        Vector3 point;
+        Ray ray;
+        RaycastHit hit;
+        int steps = stepsPerCurve * CurveCount;
+        List<Vector2> hits = new List<Vector2>(); // to reuse for smoothing rather than recasting 
+        for (int i = 0; i <= steps; i++)
+        {
+            point = GetProjectedPoint(i / (float)steps);
+            ray = new Ray(point + Vector3.up * terrain.terrainData.size.y, Vector3.down);
+            if (point.x >= 0 && point.x < GetCurrentTerrainWidth() && point.z >= 0 && point.z < GetCurrentTerrainHeight()) // check if point on bezier actually above terrain
+            {
+                if (terrain == null) terrain = GetComponent<Terrain>();
+                SetEditValues(terrain);
+                //GetTerrainCoordinates(hit, out int terX, out int terZ);
+                effectType = EffectType.paint;
+                if (terrainPaint) ModifyTerrain(Mathf.Max(0, (int)point.x - areaOfEffectSize / 2), Mathf.Max(0, (int)point.z - areaOfEffectSize / 2));
+                if (snapHeight)
+                {
+                    //painter.SetHeights();
+                    float y = GetTerrainHeight(GetPoint(i / (float)steps).y);
+                    hits.Add(new Vector2(point.x, point.z));
+                    //painter.ModifyHeight(terZ, terX, y);
+                    //painter.effectType = TerrainPainter.EffectType.heightSnap;
+                    ModifyHeight(Mathf.Max(0, (int)point.x - heightAdjustmentArea / 2), Mathf.Max(0, (int)point.z - heightAdjustmentArea / 2), y);
                 }
             }
         }
