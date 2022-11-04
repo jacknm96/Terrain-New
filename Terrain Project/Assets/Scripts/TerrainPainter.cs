@@ -156,7 +156,7 @@ public class TerrainPainter : BezierSpline
         projectedPoints = new Vector3[points.Length];
         for (int i = 0; i < points.Length; i++)
         {
-            projectedPoints[i] = WorldToTerrainCoordinates(points[i], -transform.up);
+            projectedPoints[i] = WorldToTerrainCoordinates(points[i] + Vector3.up * terrain.terrainData.size.y, Vector3.down);
         }
     }
 
@@ -173,6 +173,30 @@ public class TerrainPainter : BezierSpline
             return new Vector3(x, 0, z);
         }
         return Vector3.negativeInfinity;
+    }
+
+    /// <summary>
+    /// Calculates our bounding box along the projected bezier to have a focused iteration, rather than iterating through whole terrain map
+    /// </summary>
+    /// <param name="minX"></param>
+    /// <param name="minY"></param>
+    /// <param name="maxX"></param>
+    /// <param name="maxZ"></param>
+    void CalculateBoundingBox(out int minX, out int minY, out int maxX, out int maxY)
+    {
+        minX = minY = int.MaxValue;
+        maxX = maxY = int.MinValue;
+        foreach (Vector3 p in projectedPoints)
+        {
+            if (p.x < minX) minX = (int)p.x;
+            if (p.x > maxX) maxX = (int)p.x;
+            if (p.z < minY) minY = (int)p.z;
+            if (p.z > maxY) maxY = (int)p.z;
+        }
+        minX = Mathf.Max(0, minX - heightAdjustmentArea / 2);
+        minY = Mathf.Max(0, minY - heightAdjustmentArea / 2);
+        maxX = Mathf.Min(terrain.terrainData.heightmapResolution, maxX + heightAdjustmentArea / 2);
+        maxY = Mathf.Min(terrain.terrainData.heightmapResolution, maxY + heightAdjustmentArea / 2);
     }
 
     /// <summary>
@@ -217,6 +241,7 @@ public class TerrainPainter : BezierSpline
     /// <returns></returns>
     public Vector3 GetTerrainSize()
     {
+        if (currentTerrainData == null) currentTerrainData = terrain.terrainData;
         return currentTerrainData.size;
     }
 
@@ -684,15 +709,44 @@ public class TerrainPainter : BezierSpline
     public void PaintAlongProjectedBezier()
     {
         GenerateProjectedCoords();
+        CalculateBoundingBox(out int minX, out int minY, out int maxX, out int maxY);
         Vector3 point;
-        Ray ray;
-        RaycastHit hit;
-        int steps = stepsPerCurve * CurveCount;
-        List<Vector2> hits = new List<Vector2>(); // to reuse for smoothing rather than recasting 
-        for (int i = 0; i <= steps; i++)
+        if (terrain == null) terrain = GetComponent<Terrain>();
+        heights = GetCurrentTerrainHeightMap();
+
+        //Debug.Log(minX + ", " + maxX + ", " + minY + ", " + maxY);
+        
+        for (int i = minX; i < maxX; i++)
+        {
+            for (int j = minY; j < maxY; j++)
+            {
+                /*if (i == maxX - 1 && j == maxY - 1) 
+                    Debug.Log("here");*/
+                point = new Vector3(i, 0, j);
+                Vector3 closest = Project(point, out float t);
+                float dist = Vector3.Distance(point, closest);
+                float y = GetTerrainHeight(GetPoint(t).y);
+                bool raising = y > undoHeightHolder[(int)closest.x, (int)closest.z];
+                float h = heights[j, i];
+                float diff = y - h;
+                float distRatio = dist / Mathf.Sqrt((heightAdjustmentArea / 2) * (heightAdjustmentArea / 2) + (heightAdjustmentArea / 2) * (heightAdjustmentArea / 2));
+                float yRatio = y - (diff * distRatio * heightAdjustmentSlope);
+                if (raising)
+                {
+                    heights[j, i] = Mathf.Max(yRatio, h); // use higher height so we don't override previous height raise with lower
+                }
+                else
+                {
+                    heights[j, i] = Mathf.Min(yRatio, h); // use lower height so we don't override previous height lower with raise
+                }
+                
+                //if (i == minX || i == maxX - 1 || j == minY || j == maxY - 1) heights[j, i] = 1;
+            }
+        }
+        terrain.terrainData.SetHeights(0, 0, heights);
+        /*for (int i = 0; i <= steps; i++)
         {
             point = GetProjectedPoint(i / (float)steps);
-            ray = new Ray(point + Vector3.up * terrain.terrainData.size.y, Vector3.down);
             if (point.x >= 0 && point.x < GetCurrentTerrainWidth() && point.z >= 0 && point.z < GetCurrentTerrainHeight()) // check if point on bezier actually above terrain
             {
                 if (terrain == null) terrain = GetComponent<Terrain>();
@@ -710,7 +764,7 @@ public class TerrainPainter : BezierSpline
                     ModifyHeight(Mathf.Max(0, (int)point.x - heightAdjustmentArea / 2), Mathf.Max(0, (int)point.z - heightAdjustmentArea / 2), y);
                 }
             }
-        }
+        }*/
         /*if (snapHeight) // smooth
         {
             effectType = EffectType.smooth;
@@ -719,6 +773,73 @@ public class TerrainPainter : BezierSpline
                 ModifyTerrain(Mathf.Max(0, (int)step.x - heightAdjustmentArea / 2), Mathf.Max(0, (int)step.y - heightAdjustmentArea / 2));
             }
         }*/
+    }
+
+    List<Vector3> lut = new List<Vector3>();
+
+    List<Vector3> GetLUT(int steps = 100)
+    {
+        if (lut.Count == steps)
+        {
+            return lut;
+        }
+        // n steps means n+1 points
+        steps++;
+        lut.Clear();
+        for (int i = 0; i < steps; i++)
+        {
+            float t = (float)i / (steps - 1);
+            Vector3 p = GetProjectedPoint(t);
+            lut.Add(p);
+        }
+        return lut;
+    }
+
+    int FindClosest(List<Vector3> LUT, Vector3 point)
+    {
+        float mdist = float.MaxValue;
+        int closestIndex = 0;
+        for (int i = 0; i < LUT.Count; i++)
+        {
+            float d = Vector3.Distance(point, LUT[i]);
+            if (d < mdist)
+            {
+                mdist = d;
+                closestIndex = i;
+            }
+        }
+        return closestIndex;
+    }
+
+    public Vector3 Project(Vector3 point, out float t)
+    {
+        // step 1: coarse check
+        List<Vector3> LUT = GetLUT(stepsPerCurve);
+        int l = LUT.Count - 1;
+        int closestIndex = FindClosest(LUT, point);
+        float t1 = (float)(closestIndex - 1) / l;
+        float t2 = (float)(closestIndex + 1) / l;
+        t = t1;
+        float step = 0.1f / l;
+
+        // step 2: fine check
+        float mdist = Vector3.Distance(LUT[closestIndex], point);
+        float d;
+        Vector3 p;
+        Vector3 closest = LUT[closestIndex];
+        mdist += 1;
+        for (float i = t1; i < t2 + step; i += step)
+        {
+            p = GetProjectedPoint(i);
+            d = Vector3.Distance(point, p);
+            if (d < mdist)
+            {
+                mdist = d;
+                closest = p;
+                t = i;
+            }
+        }
+        return closest;
     }
 
     float GetSumOfFloats(float[] vals)

@@ -10,8 +10,6 @@ public class BezierSpline : MonoBehaviour {
 	[SerializeField] protected BezierControlPointMode[] modes;
 	[SerializeField] protected bool loop;
 
-	List<Vector3> lut = new List<Vector3>();
-
 	//clear everything and reset to just a cubic bezier
 	public void Reset()
 	{
@@ -204,69 +202,6 @@ public class BezierSpline : MonoBehaviour {
 			enforcedTangent = enforcedTangent.normalized * Vector3.Distance(middle, points[enforcedIndex]);
 		}
 		points[enforcedIndex] = middle + enforcedTangent;
-	}
-
-	List<Vector3> GetLUT(int steps = 100)
-	{
-		if (lut.Count == steps)
-		{
-			return lut;
-		}
-		// n steps means n+1 points
-		steps++;
-		lut.Clear();
-		for (int i = 0; i < steps; i++)
-		{
-			float t = (float)i / (steps - 1);
-			Vector3 p = GetPoint(t);
-			lut.Add(p);
-		}
-		return lut;
-	}
-
-	int FindClosest(List<Vector3> LUT, Vector3 point)
-	{
-		float mdist = float.MaxValue;
-		int closestIndex = 0;
-		for (int i = 0; i < LUT.Count; i++)
-        {
-			float d = Vector3.Distance(point, LUT[i]);
-			if (d < mdist)
-            {
-				mdist = d;
-				closestIndex = i;
-            }
-        }
-		return closestIndex;
-	}
-
-	public Vector3 Project(Vector3 point)
-	{
-		// step 1: coarse check
-		List<Vector3> LUT = GetLUT();
-		int l = LUT.Count - 1;
-		int closestIndex = FindClosest(LUT, point);
-		float t1 = (float)(closestIndex - 1) / l;
-		float t2 = (float)(closestIndex + 1) / l;
-		float step = 0.1f / l;
-
-		// step 2: fine check
-		float mdist = Vector3.Distance(LUT[closestIndex], point);
-		float d;
-		Vector3 p;
-		Vector3 closest = LUT[closestIndex];
-		mdist += 1;
-		for (float i = t1; i < t2 + step; i += step)
-		{
-			p = GetPoint(i);
-			d = Vector3.Distance(point, p);
-			if (d < mdist)
-			{
-				mdist = d;
-				closest = p;
-			}
-		}
-		return closest;
 	}
 
 
