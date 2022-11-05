@@ -112,9 +112,9 @@ public class TerrainPainter : BezierSpline
     /// <param name="hit"></param>
     /// <param name="x"></param>
     /// <param name="z"></param>
-    public void GetTerrainCoordinates(RaycastHit hit, out int x, out int z)
+    public void GetTerrainCoordinates(Vector3 point, out int x, out int z)
     {
-        Vector3 tempTerrainCoodinates = hit.point - hit.transform.position;
+        Vector3 tempTerrainCoodinates = point - transform.position;
         //This takes the world coords and makes them relative to the terrain
         Vector3 terrainCoordinates = new Vector3(
             tempTerrainCoodinates.x / GetTerrainSize().x,
@@ -156,7 +156,7 @@ public class TerrainPainter : BezierSpline
         projectedPoints = new Vector3[points.Length];
         for (int i = 0; i < points.Length; i++)
         {
-            projectedPoints[i] = WorldToTerrainCoordinates(points[i] + Vector3.up * terrain.terrainData.size.y, Vector3.down);
+            projectedPoints[i] = WorldToTerrainCoordinates(points[i]);
         }
     }
 
@@ -165,14 +165,16 @@ public class TerrainPainter : BezierSpline
     /// </summary>
     /// <param name="worldPoint"></param>
     /// <returns></returns>
-    public Vector3 WorldToTerrainCoordinates(Vector3 worldPoint, Vector3 direction)
+    public Vector3 WorldToTerrainCoordinates(Vector3 worldPoint)
     {
-        if (Physics.Raycast(worldPoint, direction, out RaycastHit hit))
+        /*if (worldPoint.x >= 0 && worldPoint.x < GetTerrainSize().x && worldPoint.z >= 0 && worldPoint.z < GetTerrainSize().z)
         {
-            GetTerrainCoordinates(hit, out int x, out int z);
+            GetTerrainCoordinates(worldPoint, out int x, out int z);
             return new Vector3(x, 0, z);
         }
-        return Vector3.negativeInfinity;
+        return Vector3.negativeInfinity;*/
+        GetTerrainCoordinates(worldPoint, out int x, out int z);
+        return new Vector3(x, 0, z);
     }
 
     /// <summary>
@@ -184,7 +186,7 @@ public class TerrainPainter : BezierSpline
     /// <param name="maxZ"></param>
     void CalculateBoundingBox(out int minX, out int minY, out int maxX, out int maxY)
     {
-        minX = minY = int.MaxValue;
+        /*minX = minY = int.MaxValue;
         maxX = maxY = int.MinValue;
         foreach (Vector3 p in projectedPoints)
         {
@@ -196,7 +198,65 @@ public class TerrainPainter : BezierSpline
         minX = Mathf.Max(0, minX - heightAdjustmentArea / 2);
         minY = Mathf.Max(0, minY - heightAdjustmentArea / 2);
         maxX = Mathf.Min(terrain.terrainData.heightmapResolution, maxX + heightAdjustmentArea / 2);
-        maxY = Mathf.Min(terrain.terrainData.heightmapResolution, maxY + heightAdjustmentArea / 2);
+        maxY = Mathf.Min(terrain.terrainData.heightmapResolution, maxY + heightAdjustmentArea / 2);*/
+        Vector2 p0 = new Vector2(projectedPoints[0].x, projectedPoints[0].z);
+        Vector2 p1 = new Vector2(projectedPoints[1].x, projectedPoints[1].z);
+        Vector2 p2 = new Vector2(projectedPoints[2].x, projectedPoints[2].z);
+        Vector2 p3 = new Vector2(projectedPoints[3].x, projectedPoints[3].z);
+        Vector2 mi = Vector2.Min(p0, p3);
+        Vector2 ma = Vector2.Max(p0, p3);
+
+        Vector2 c = -1.0f * p0 + 1.0f * p1;
+        Vector2 b = 1.0f * p0 - 2.0f * p1 + 1.0f * p2;
+        Vector2 a = -1.0f * p0 + 3.0f * p1 - 3.0f * p2 + 1.0f * p3;
+
+        Vector2 h = b * b - a * c;
+
+        if (h.x > 0.0)
+        {
+            h.x = Mathf.Sqrt(h.x);
+            float t = (-b.x - h.x) / a.x;
+            if (t > 0.0 && t < 1.0)
+            {
+                float s = 1.0f - t;
+                float q = s * s * s * p0.x + 3.0f * s * s * t * p1.x + 3.0f * s * t * t * p2.x + t * t * t * p3.x;
+                mi.x = Mathf.Min(mi.x, q);
+                ma.x = Mathf.Max(ma.x, q);
+            }
+            t = (-b.x + h.x) / a.x;
+            if (t > 0.0 && t < 1.0)
+            {
+                float s = 1.0f - t;
+                float q = s * s * s * p0.x + 3.0f * s * s * t * p1.x + 3.0f * s * t * t * p2.x + t * t * t * p3.x;
+                mi.x = Mathf.Min(mi.x, q);
+                ma.x = Mathf.Max(ma.x, q);
+            }
+        }
+
+        if (h.y > 0.0)
+        {
+            h.y = Mathf.Sqrt(h.y);
+            float t = (-b.y - h.y) / a.y;
+            if (t > 0.0 && t < 1.0)
+            {
+                float s = 1.0f - t;
+                float q = s * s * s * p0.y + 3.0f * s * s * t * p1.y + 3.0f * s * t * t * p2.y + t * t * t * p3.y;
+                mi.y = Mathf.Min(mi.y, q);
+                ma.y = Mathf.Max(ma.y, q);
+            }
+            t = (-b.y + h.y) / a.y;
+            if (t > 0.0 && t < 1.0)
+            {
+                float s = 1.0f - t;
+                float q = s * s * s * p0.y + 3.0f * s * s * t * p1.y + 3.0f * s * t * t * p2.y + t * t * t * p3.y;
+                mi.y = Mathf.Min(mi.y, q);
+                ma.y = Mathf.Max(ma.y, q);
+            }
+        }
+        minX = (int)Mathf.Max(0, mi.x - heightAdjustmentArea / 2);
+        minY = (int)Mathf.Max(0, mi.y - heightAdjustmentArea / 2);
+        maxX = (int)Mathf.Min(terrain.terrainData.heightmapResolution, ma.x + heightAdjustmentArea / 2);
+        maxY = (int)Mathf.Min(terrain.terrainData.heightmapResolution, ma.y + heightAdjustmentArea / 2);
     }
 
     /// <summary>
@@ -209,7 +269,7 @@ public class TerrainPainter : BezierSpline
     private float GetSurroundingHeights(float[,] height, int x, int z)
     {
         float value; // this will temporarily hold the value at each point
-        float avg = terrainHeightMap[x, z]; // we will add all the heights to this and divide by int num bellow to get the average height
+        float avg = height[x, z]; // we will add all the heights to this and divide by int num bellow to get the average height
         int num = 1;
         for (int i = 0; i < 4; i++) //this will loop us through the possible surrounding spots
         {
@@ -217,13 +277,13 @@ public class TerrainPainter : BezierSpline
             {
                 // These give us the values surrounding the point
                 if (i == 0)
-                { value = terrainHeightMap[x + 1, z]; }
+                { value = height[x + 1, z]; }
                 else if (i == 1)
-                { value = terrainHeightMap[x - 1, z]; }
+                { value = height[x - 1, z]; }
                 else if (i == 2)
-                { value = terrainHeightMap[x, z + 1]; }
+                { value = height[x, z + 1]; }
                 else
-                { value = terrainHeightMap[x, z - 1]; }
+                { value = height[x, z - 1]; }
                 num++; // keeps track of how many iterations were successful  
                 avg += value;
             }
@@ -682,7 +742,7 @@ public class TerrainPainter : BezierSpline
             {
                 terrain = GetTerrainAtObject(hit.transform.gameObject);
                 SetEditValues(terrain);
-                GetTerrainCoordinates(hit, out int terX, out int terZ);
+                GetTerrainCoordinates(point, out int terX, out int terZ);
                 effectType = EffectType.paint;
                 if (terrainPaint) ModifyTerrain(Mathf.Max(0, terX - areaOfEffectSize / 2), Mathf.Max(0, terZ - areaOfEffectSize / 2));
                 if (snapHeight)
@@ -708,42 +768,44 @@ public class TerrainPainter : BezierSpline
 
     public void PaintAlongProjectedBezier()
     {
+        if (terrain == null) terrain = GetComponent<Terrain>();
+        SetEditValues(terrain);
         GenerateProjectedCoords();
         CalculateBoundingBox(out int minX, out int minY, out int maxX, out int maxY);
         Vector3 point;
-        if (terrain == null) terrain = GetComponent<Terrain>();
+        
         heights = GetCurrentTerrainHeightMap();
-
         //Debug.Log(minX + ", " + maxX + ", " + minY + ", " + maxY);
         
-        for (int i = minX; i < maxX; i++)
+        for (int i = minX; i <= maxX; i++)
         {
-            for (int j = minY; j < maxY; j++)
+            for (int j = minY; j <= maxY; j++)
             {
                 /*if (i == maxX - 1 && j == maxY - 1) 
                     Debug.Log("here");*/
-                point = new Vector3(i, 0, j);
-                Vector3 closest = Project(point, out float t);
-                float dist = Vector3.Distance(point, closest);
-                float y = GetTerrainHeight(GetPoint(t).y);
-                bool raising = y > undoHeightHolder[(int)closest.x, (int)closest.z];
-                float h = heights[j, i];
-                float diff = y - h;
-                float distRatio = dist / Mathf.Sqrt((heightAdjustmentArea / 2) * (heightAdjustmentArea / 2) + (heightAdjustmentArea / 2) * (heightAdjustmentArea / 2));
-                float yRatio = y - (diff * distRatio * heightAdjustmentSlope);
-                if (raising)
+                if (snapHeight)
                 {
-                    heights[j, i] = Mathf.Max(yRatio, h); // use higher height so we don't override previous height raise with lower
+                    point = new Vector3(i, 0, j);
+                    Vector3 closest = Project(point, out float t);
+                    float dist = Vector3.Distance(point, closest);
+                    float y = GetTerrainHeight(GetPoint(t).y);
+                    bool raising = y >= undoHeightHolder[(int)point.z, (int)point.x];
+                    float h = heights[j, i];
+                    float diff = y - h;
+                    float distRatio = dist / Mathf.Sqrt((heightAdjustmentArea / 2) * (heightAdjustmentArea / 2) + (heightAdjustmentArea / 2) * (heightAdjustmentArea / 2));
+                    float yRatio = y - (diff * distRatio * heightAdjustmentSlope);
+                    if (raising)
+                    {
+                        heights[j, i] = Mathf.Max(yRatio, h); // use higher height so we don't override previous height raise with lower
+                    }
+                    else
+                    {
+                        heights[j, i] = Mathf.Min(yRatio, h); // use lower height so we don't override previous height lower with raise
+                    }
                 }
-                else
-                {
-                    heights[j, i] = Mathf.Min(yRatio, h); // use lower height so we don't override previous height lower with raise
-                }
-                
-                //if (i == minX || i == maxX - 1 || j == minY || j == maxY - 1) heights[j, i] = 1;
+                //if (i == minX || i == maxX - 1 || j == minY || j == maxY - 1) heights[j, i] = 1; //show bounding box
             }
         }
-        terrain.terrainData.SetHeights(0, 0, heights);
         /*for (int i = 0; i <= steps; i++)
         {
             point = GetProjectedPoint(i / (float)steps);
@@ -765,14 +827,19 @@ public class TerrainPainter : BezierSpline
                 }
             }
         }*/
-        /*if (snapHeight) // smooth
+        if (snapHeight) // smooth
         {
-            effectType = EffectType.smooth;
-            foreach (Vector2 step in hits)
+            for (int i = minX; i <= maxX; i++)
             {
-                ModifyTerrain(Mathf.Max(0, (int)step.x - heightAdjustmentArea / 2), Mathf.Max(0, (int)step.y - heightAdjustmentArea / 2));
+                for (int j = minY; j <= maxY; j++)
+                {
+                    float smoothH = GetSurroundingHeights(heights, j, i);
+                    float h = heights[j, i];
+                    heights[j, i] = Mathf.Lerp(h, smoothH, smoothStrength);
+                }
             }
-        }*/
+        }
+        terrain.terrainData.SetHeights(0, 0, heights);
     }
 
     List<Vector3> lut = new List<Vector3>();

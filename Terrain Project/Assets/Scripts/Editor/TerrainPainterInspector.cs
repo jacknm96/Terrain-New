@@ -84,7 +84,7 @@ public class TerrainPainterInspector : Editor
         }
 
 		//draws where along the curve brush will paint, and radius of brush
-		if (!painting && (terrainPaint || alignHeight))
+		if ((!painting || painting) && (terrainPaint || alignHeight))
         {
 			Vector3 point;
 			int steps = stepSizePerCurve * painter.CurveCount;
