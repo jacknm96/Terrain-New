@@ -44,6 +44,7 @@ public class TerrainPainter : BezierSpline
     public bool painting;
 
     public int heightAdjustmentArea;
+    public int heightPathArea;
     public float heightAdjustmentSlope;
 
     Vector3 startPos;
@@ -776,7 +777,9 @@ public class TerrainPainter : BezierSpline
         
         heights = GetCurrentTerrainHeightMap();
         //Debug.Log(minX + ", " + maxX + ", " + minY + ", " + maxY);
-        
+        float lengthDiff = heightAdjustmentArea - heightPathArea;
+        float length = Mathf.Sqrt((lengthDiff / 2) * (lengthDiff / 2) + (lengthDiff / 2) * (lengthDiff / 2));
+
         for (int i = minX; i <= maxX; i++)
         {
             for (int j = minY; j <= maxY; j++)
@@ -787,20 +790,24 @@ public class TerrainPainter : BezierSpline
                 {
                     point = new Vector3(i, 0, j);
                     Vector3 closest = Project(point, out float t);
-                    float dist = Vector3.Distance(point, closest);
+                    float dist = Vector3.Distance(point, closest) - heightPathArea / 2;
                     float y = GetTerrainHeight(GetPoint(t).y);
-                    bool raising = y >= undoHeightHolder[(int)point.z, (int)point.x];
-                    float h = heights[j, i];
-                    float diff = y - h;
-                    float distRatio = dist / Mathf.Sqrt((heightAdjustmentArea / 2) * (heightAdjustmentArea / 2) + (heightAdjustmentArea / 2) * (heightAdjustmentArea / 2));
-                    float yRatio = y - (diff * distRatio * heightAdjustmentSlope);
-                    if (raising)
+                    if (dist <= 0) heights[j, i] = y;
+                    else if (dist <= length)
                     {
-                        heights[j, i] = Mathf.Max(yRatio, h); // use higher height so we don't override previous height raise with lower
-                    }
-                    else
-                    {
-                        heights[j, i] = Mathf.Min(yRatio, h); // use lower height so we don't override previous height lower with raise
+                        bool raising = y >= undoHeightHolder[(int)point.z, (int)point.x];
+                        float h = heights[j, i];
+                        float distRatio = dist / length;
+                        float yRatio = heightAdjustmentSlope * distRatio;
+                        float adjustedHeight = Mathf.Lerp(y, h, yRatio);
+                        if (raising)
+                        {
+                            heights[j, i] = Mathf.Max(adjustedHeight, h); // use higher height so we don't override previous height raise with lower
+                        }
+                        else
+                        {
+                            heights[j, i] = Mathf.Min(adjustedHeight, h); // use lower height so we don't override previous height lower with raise
+                        }
                     }
                 }
                 //if (i == minX || i == maxX - 1 || j == minY || j == maxY - 1) heights[j, i] = 1; //show bounding box

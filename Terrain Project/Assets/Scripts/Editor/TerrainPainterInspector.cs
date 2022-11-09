@@ -20,12 +20,12 @@ public class TerrainPainterInspector : Editor
 	bool alignHeight;
 	bool foldoutPaintingSettings = true;
 	bool foldoutHeightSettings = true;
-	float flatten;
 	bool painting;
 	int stepSizePerCurve;
 	int layerPaint;
 
 	int heightArea;
+	int pathArea;
 	float heightSlope;
 	float smoothStrength;
 
@@ -102,6 +102,8 @@ public class TerrainPainterInspector : Editor
                     {
 						Handles.color = Color.red;
 						Handles.DrawWireDisc(point, Vector3.up, heightArea);
+						Handles.color = Color.blue;
+						Handles.DrawWireDisc(point, Vector3.up, pathArea);
 					}
 				}
 			}
@@ -316,6 +318,22 @@ public class TerrainPainterInspector : Editor
 					heightArea = Mathf.Max(heightArea, 1);
 					painter.heightAdjustmentArea = heightArea;
 					painter.GenerateBrush(painter.brushIMG, painter.heightAdjustmentArea, true);
+					if (painting)
+					{
+						painter.UndoPaint();
+						painter.PaintAlongProjectedBezier();
+					}
+					EditorUtility.SetDirty(painter);
+				}
+
+				// set path adjustment area
+				EditorGUI.BeginChangeCheck();
+				pathArea = EditorGUILayout.IntSlider(new GUIContent("Path Area", "Flat area for path"), painter.heightPathArea, 0, painter.heightAdjustmentArea);
+				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+				{
+					Undo.RecordObject(painter, "Change Path Area");
+					pathArea = Mathf.Max(pathArea, 0);
+					painter.heightPathArea = pathArea;
 					if (painting)
 					{
 						painter.UndoPaint();
