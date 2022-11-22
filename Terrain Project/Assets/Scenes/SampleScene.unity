@@ -347,8 +347,8 @@ MonoBehaviour:
   paints: {fileID: 8574412962073106934, guid: 950288b0204552e48afc891864dd7813, type: 2}
   paint: 1
   stepsPerCurve: 9
-  terrainPaint: 0
-  snapHeight: 0
+  paintTerrain: 0
+  paintHeight: 0
   painting: 0
   heightAdjustmentArea: 37
   heightPathArea: 0

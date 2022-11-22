@@ -108,6 +108,25 @@ public class BezierSpline : MonoBehaviour {
 		}
 	}
 
+	public void RemoveCurve()
+    {
+		Vector3[] tempPoints = new Vector3[points.Length - 3];
+		BezierControlPointMode[] tempModes = new BezierControlPointMode[modes.Length - 1];
+		for (int i = 0; i < tempPoints.Length; i++)
+        {
+			tempPoints[i] = points[i];
+			if (i < tempModes.Length) tempModes[i] = modes[i];
+        }
+		if (loop)
+		{
+			tempPoints[tempPoints.Length - 1] = tempPoints[0];//set the final node to the first node
+			tempModes[tempModes.Length - 1] = tempModes[0]; //set the mode of the final node to the same as the first
+			EnforceMode(0);
+		}
+		points = tempPoints;
+		modes = tempModes;
+	}
+
 
 
 	public Vector3 GetControlPoint (int index) {

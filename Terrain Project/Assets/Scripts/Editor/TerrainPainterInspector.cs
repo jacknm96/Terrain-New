@@ -84,7 +84,7 @@ public class TerrainPainterInspector : Editor
         }
 
 		//draws where along the curve brush will paint, and radius of brush
-		if ((!painting || painting) && (terrainPaint || alignHeight))
+		if ((!painting) && (terrainPaint || alignHeight))
         {
 			Vector3 point;
 			int steps = stepSizePerCurve * painter.CurveCount;
@@ -194,11 +194,11 @@ public class TerrainPainterInspector : Editor
 
 		// align height toggle
 		EditorGUI.BeginChangeCheck();
-		terrainPaint = EditorGUILayout.Toggle("Paint Texture", painter.terrainPaint);
+		terrainPaint = EditorGUILayout.Toggle("Paint Texture", painter.paintTerrain);
 		if (EditorGUI.EndChangeCheck())
 		{
 			Undo.RecordObject(painter, "Paint toggle");
-			painter.terrainPaint = terrainPaint;
+			painter.paintTerrain = terrainPaint;
 			if (painting)
 			{
 				if (terrainPaint) painter.StartTerrainPaint();
@@ -288,11 +288,11 @@ public class TerrainPainterInspector : Editor
 
 		// align height toggle
 		EditorGUI.BeginChangeCheck();
-		alignHeight = EditorGUILayout.Toggle("Snap Height", painter.snapHeight);
+		alignHeight = EditorGUILayout.Toggle("Snap Height", painter.paintHeight);
 		if (EditorGUI.EndChangeCheck())
         {
 			Undo.RecordObject(painter, "Height toggle");
-			painter.snapHeight = alignHeight;
+			painter.paintHeight = alignHeight;
 			if (painting)
 			{
 				if (alignHeight) painter.StartHeightAdjustment();
@@ -454,7 +454,27 @@ public class TerrainPainterInspector : Editor
 		{
 			Undo.RecordObject(painter, "Add Curve");
 			painter.AddCurve();
+			if (painting)
+			{
+				painter.UndoPaint();
+				painter.PaintAlongProjectedBezier();
+			}
 			EditorUtility.SetDirty(painter);
+		}
+		if (painter.CurveCount > 1)
+        {
+			//add a button for removing a curve from the spline
+			if (GUILayout.Button("Remove Curve"))
+			{
+				Undo.RecordObject(painter, "Remove Curve");
+				painter.RemoveCurve();
+				if (painting)
+                {
+					painter.UndoPaint();
+					painter.PaintAlongProjectedBezier();
+				}
+				EditorUtility.SetDirty(painter);
+			}
 		}
 
 	}
