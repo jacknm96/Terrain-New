@@ -28,6 +28,8 @@ public class TerrainPainterInspector : Editor
 	int pathArea;
 	float heightSlope;
 	float smoothStrength;
+	AnimationCurve slopeCurve;
+	bool useSlopeCurve;
 
 	//for handlemode settings
 	private static Color[] modeColors = {
@@ -372,6 +374,37 @@ public class TerrainPainterInspector : Editor
 						painter.PaintAlongProjectedBezier();
 					}
 					EditorUtility.SetDirty(painter);
+				}
+
+				// use slope curve toggle
+				EditorGUI.BeginChangeCheck();
+				useSlopeCurve = EditorGUILayout.Toggle("Use Slope Curve", painter.useSlopeCurve);
+				if (EditorGUI.EndChangeCheck())
+				{
+					Undo.RecordObject(painter, "Use Slope toggle");
+					painter.useSlopeCurve = useSlopeCurve;
+					if (painting)
+					{
+						painter.UndoPaint();
+						painter.PaintAlongProjectedBezier();
+					}
+					EditorUtility.SetDirty(painter);
+				}
+				if (useSlopeCurve)
+                {
+					EditorGUI.BeginChangeCheck();
+					slopeCurve = EditorGUILayout.CurveField("Use Slope Curve", painter.slopeCurve);
+					if (EditorGUI.EndChangeCheck())
+					{
+						Undo.RecordObject(painter, "Change Slope Curve");
+						painter.slopeCurve = slopeCurve;
+						if (painting)
+						{
+							painter.UndoPaint();
+							painter.PaintAlongProjectedBezier();
+						}
+						EditorUtility.SetDirty(painter);
+					}
 				}
 
 				EditorGUI.indentLevel--;

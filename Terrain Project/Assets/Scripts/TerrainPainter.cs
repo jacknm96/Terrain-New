@@ -46,6 +46,8 @@ public class TerrainPainter : BezierSpline
     public int heightAdjustmentArea;
     public int heightPathArea;
     public float heightAdjustmentSlope;
+    public bool useSlopeCurve;
+    public AnimationCurve slopeCurve;
 
     Vector3 startPos;
     Vector3 endPos;
@@ -766,13 +768,6 @@ public class TerrainPainter : BezierSpline
         if (terrain == null) terrain = GetComponent<Terrain>();
         SetEditValues(terrain);
         GenerateProjectedCoords();
-        CalculateBoundingBox(out int minX, out int minY, out int maxX, out int maxY);
-        Vector3 point;
-        
-        heights = GetCurrentTerrainHeightMap();
-        //Debug.Log(minX + ", " + maxX + ", " + minY + ", " + maxY);
-        float lengthDiff = heightAdjustmentArea - heightPathArea;
-        float length = Mathf.Sqrt((lengthDiff / 2) * (lengthDiff / 2) + (lengthDiff / 2) * (lengthDiff / 2));
 
         if (paintTerrain)
         {
@@ -787,6 +782,13 @@ public class TerrainPainter : BezierSpline
         } 
         if (paintHeight)
         {
+            CalculateBoundingBox(out int minX, out int minY, out int maxX, out int maxY);
+            Vector3 point;
+
+            heights = GetCurrentTerrainHeightMap();
+            //Debug.Log(minX + ", " + maxX + ", " + minY + ", " + maxY);
+            float lengthDiff = heightAdjustmentArea - heightPathArea;
+            float length = Mathf.Sqrt((lengthDiff / 2) * (lengthDiff / 2) + (lengthDiff / 2) * (lengthDiff / 2));
             for (int i = minX; i <= maxX; i++)
             {
                 for (int j = minY; j <= maxY; j++)
@@ -803,8 +805,11 @@ public class TerrainPainter : BezierSpline
                         bool raising = y >= undoHeightHolder[(int)point.z, (int)point.x];
                         float h = heights[j, i];
                         float distRatio = dist / length;
-                        float yRatio = heightAdjustmentSlope * distRatio;
-                        float adjustedHeight = Mathf.Lerp(y, h, yRatio);
+                        float heightLerp;
+                        if (useSlopeCurve) heightLerp = slopeCurve.Evaluate(distRatio);
+                        else heightLerp = 1 - distRatio;
+                        float yRatio = heightAdjustmentSlope * heightLerp;
+                        float adjustedHeight = Mathf.Lerp(h, y, yRatio);
                         if (raising)
                         {
                             heights[j, i] = Mathf.Max(adjustedHeight, h); // use higher height so we don't override previous height raise with lower
