@@ -44,6 +44,8 @@ public class TerrainPainterInspector : Editor
 
 	//for selectable points
 	private int selectedIndex = -1; //default value for none selected
+	private int curvesToSplitInto;
+	private bool decidingSplit;
 
 	//grab our serialized properties
     private void OnEnable()
@@ -146,7 +148,7 @@ public class TerrainPainterInspector : Editor
 			if (mod != 0)
             {
                 handlePoints[mod] = point;
-                if (CalculateBezierControlPoints(controlPoints[0], handleTransform.TransformPoint(handlePoints[1]), handleTransform.TransformPoint(handlePoints[2]), controlPoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
+                if (painter.CalculateBezierControlPoints(controlPoints[0], handleTransform.TransformPoint(handlePoints[1]), handleTransform.TransformPoint(handlePoints[2]), controlPoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
                 {
                     painter.SetControlPoint(index + 1, controlPoints[1]);
                     painter.SetControlPoint(index + 2, controlPoints[2]);
@@ -168,6 +170,50 @@ public class TerrainPainterInspector : Editor
 		{
 			Undo.RecordObject(painter, "Change Point Mode");
 			painter.SetControlPointMode(selectedIndex, mode);
+			EditorUtility.SetDirty(painter);
+		}
+
+		if (decidingSplit)
+        {
+			EditorGUILayout.BeginHorizontal();
+
+			EditorGUI.BeginChangeCheck();
+			curvesToSplitInto = EditorGUILayout.IntField("Curves To Split", painter.curvesToSplitInto);
+			if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+			{
+				Undo.RecordObject(painter, "Curves To Split");
+				curvesToSplitInto = Mathf.Max(curvesToSplitInto, 2);
+				painter.curvesToSplitInto = curvesToSplitInto;
+				EditorUtility.SetDirty(painter);
+			}
+
+			if (GUILayout.Button("Split"))
+			{
+				Undo.RecordObject(painter, "Split Curve");
+				painter.SplitCurve(painter.curvesToSplitInto, selectedIndex);
+				decidingSplit = false;
+				if (painting)
+				{
+					painter.UndoPaint();
+					painter.PaintAlongProjectedBezier();
+				}
+				EditorUtility.SetDirty(painter);
+			}
+
+			if (GUILayout.Button("Cancel"))
+			{
+				Undo.RecordObject(painter, "Cancel Split");
+				decidingSplit = false;
+				EditorUtility.SetDirty(painter);
+			}
+
+			EditorGUILayout.EndHorizontal();
+        }
+		//add a button for splitting the curve
+		else if (GUILayout.Button("Split Curve"))
+		{
+			Undo.RecordObject(painter, "Decide Split");
+			decidingSplit = true;
 			EditorUtility.SetDirty(painter);
 		}
 	}
@@ -601,7 +647,7 @@ public class TerrainPainterInspector : Editor
 					//painter.SetControlPoint(index, handleTransform.InverseTransformPoint(handlePoints[i]));
 
 					// if index % 3 == 0, we are at root point and no difference between handle and control point
-					if (selectedIndex % 3 != 0 && CalculateBezierControlPoints(handlePoints[0], handlePoints[1], handlePoints[2], handlePoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
+					if (selectedIndex % 3 != 0 && painter.CalculateBezierControlPoints(handlePoints[0], handlePoints[1], handlePoints[2], handlePoints[3], 1 / 3.0f, 2 / 3.0f, ref controlPoints[1], ref controlPoints[2]))
 					{
 						painter.SetControlPoint(index + 1, handleTransform.InverseTransformPoint(controlPoints[1]));
 						painter.SetControlPoint(index + 2, handleTransform.InverseTransformPoint(controlPoints[2]));
@@ -617,43 +663,6 @@ public class TerrainPainterInspector : Editor
 		}
 		return controlPoints;
     }
-
-	
-
-	bool CalculateBezierControlPoints(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float u, float v, ref Vector3 control1, ref Vector3 control2)
-	{
-		float a = 0.0f, b = 0.0f, c = 0.0f, d = 0.0f, det = 0.0f;
-
-		if ((u <= 0.0) || (u >= 1.0) || (v <= 0.0) || (v >= 1.0) || (u >= v))
-			return false; /* failure */
-
-		a = 3 * (1 - u) * (1 - u) * u; 
-		b = 3 * (1 - u) * u * u;
-		c = 3 * (1 - v) * (1 - v) * v; 
-		d = 3 * (1 - v) * v * v;
-		det = a * d - b * c;
-		/* unnecessary, but just in case... */
-		if (det == 0.0) return false; /* failure */
-
-		Vector3 q1 = p1 - new Vector3(((1 - u) * (1 - u) * (1 - u) * p0.x + u * u * u * p3.x), 
-									((1 - u) * (1 - u) * (1 - u) * p0.y + u * u * u * p3.y), 
-									((1 - u) * (1 - u) * (1 - u) * p0.z + u * u * u * p3.z));
-		Vector3 q2 = p2 - new Vector3(((1 - v) * (1 - v) * (1 - v) * p0.x + v * v * v * p3.x),
-									((1 - v) * (1 - v) * (1 - v) * p0.y + v * v * v * p3.y),
-									((1 - v) * (1 - v) * (1 - v) * p0.z + v * v * v * p3.z));
-
-		control1.x = d * q1.x - b * q2.x;
-		control1.y = d * q1.y - b * q2.y;
-		control1.z = d * q1.z - b * q2.z;
-		control1 /= det;
-
-		control2.x = (-c) * q1.x + a * q2.x;
-		control2.y = (-c) * q1.y + a * q2.y;
-		control2.z = (-c) * q1.z + a * q2.z;
-		control2 /= det;
-
-		return true; /* success */
-	}
 
 	void OnUndo()
 	{

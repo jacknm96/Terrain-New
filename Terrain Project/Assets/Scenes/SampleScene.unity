@@ -332,8 +332,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   points:
   - {x: 158.94012, y: 0, z: 34.03427}
-  - {x: 356.15906, y: 97.14147, z: 95.39362}
-  - {x: 495.04828, y: 100.34263, z: 138.77866}
+  - {x: 356.15906, y: 91.07345, z: 95.39362}
+  - {x: 495.04828, y: 103.37671, z: 138.77866}
   - {x: 536.65784, y: 0, z: 76.29632}
   modes: 0000000000000000
   loop: 0
@@ -347,6 +347,7 @@ MonoBehaviour:
   paints: {fileID: 8574412962073106934, guid: 950288b0204552e48afc891864dd7813, type: 2}
   paint: 1
   stepsPerCurve: 9
+  curvesToSplitInto: 3
   paintTerrain: 0
   paintHeight: 0
   painting: 0

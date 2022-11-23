@@ -39,6 +39,7 @@ public class TerrainPainter : BezierSpline
     float[,,] splat; // A splat map is what unity uses to overlay all of your paints on to the terrain
     float[,,] undoSplatHolder = new float[0, 0, 0]; // holds splat map information from when we started editing for the purpose of reverting changes
     public int stepsPerCurve;
+    public int curvesToSplitInto;
     public bool paintTerrain;
     public bool paintHeight;
     public bool painting;

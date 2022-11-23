@@ -127,6 +127,52 @@ public class BezierSpline : MonoBehaviour {
 		modes = tempModes;
 	}
 
+	public void SplitCurve(int num, int index)
+	{
+		if (num <= 1 || index < 0 || index >= points.Length) return;
+		int offset = 3 * (num - 1);
+		Vector3[] tempPoints = new Vector3[points.Length + offset]; // add space for new generated points
+		BezierControlPointMode[] tempModes = new BezierControlPointMode[modes.Length + num - 1];
+		int controlIndex = index - (index % 3);
+		
+		// copy un-split points
+		for (int i = 0; i < controlIndex; i++)
+        {
+			tempPoints[i] = points[i];
+			if (i < modes.Length) tempModes[i] = modes[i];
+		}
+		for (int i = controlIndex + 3; i < points.Length; i++)
+		{
+			tempPoints[i + offset] = points[i];
+			if (i < modes.Length) tempModes[i + num - 1] = modes[i];
+		}
+
+		Vector3 p0 = points[controlIndex];
+		float controlT = (float)(controlIndex / 3) / CurveCount;
+		float stepSize = 1.0f / num / 3 / CurveCount;
+		for (int i = 0; i < num; i++)
+        {
+			float u = controlT + stepSize * (3 * i + 1);
+			float v = controlT + stepSize * (3 * i + 2);
+			float w = controlT + stepSize * (3 * i + 3);
+			Vector3 p1 = GetPoint(u);
+			Vector3 p2 = GetPoint(v);
+			Vector3 p3 = GetPoint(w);
+			Vector3 control1 = Vector3.zero, control2 = Vector3.zero;
+			CalculateBezierControlPoints(p0, p1, p2, p3, 1 / 3.0f, 2 / 3.0f, ref control1, ref control2);
+			int tempIndex = controlIndex + 3 * i;
+			if (tempIndex >= tempPoints.Length - 2) break;
+			tempPoints[tempIndex] = p0;
+			tempPoints[tempIndex + 1] = control1;
+			tempPoints[tempIndex + 2] = control2;
+			tempPoints[tempIndex + 3] = p3;
+			tempModes[(controlIndex / 3) + 1] = modes[controlIndex / 3];
+			p0 = p3;
+        }
+		modes = tempModes;
+		points = tempPoints;
+	}
+
 
 
 	public Vector3 GetControlPoint (int index) {
@@ -164,6 +210,40 @@ public class BezierSpline : MonoBehaviour {
 		}
 		points[index] = point;
 		EnforceMode(index);
+	}
+
+	public bool CalculateBezierControlPoints(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float u, float v, ref Vector3 control1, ref Vector3 control2)
+	{
+		if ((u <= 0.0) || (u >= 1.0) || (v <= 0.0) || (v >= 1.0) || (u >= v))
+			return false; /* failure */
+
+		float a, b, c, d, det;
+		a = 3 * (1 - u) * (1 - u) * u;
+		b = 3 * (1 - u) * u * u;
+		c = 3 * (1 - v) * (1 - v) * v;
+		d = 3 * (1 - v) * v * v;
+		det = a * d - b * c;
+		/* unnecessary, but just in case... */
+		if (det == 0.0) return false; /* failure */
+
+		Vector3 q1 = p1 - new Vector3(((1 - u) * (1 - u) * (1 - u) * p0.x + u * u * u * p3.x),
+									((1 - u) * (1 - u) * (1 - u) * p0.y + u * u * u * p3.y),
+									((1 - u) * (1 - u) * (1 - u) * p0.z + u * u * u * p3.z));
+		Vector3 q2 = p2 - new Vector3(((1 - v) * (1 - v) * (1 - v) * p0.x + v * v * v * p3.x),
+									((1 - v) * (1 - v) * (1 - v) * p0.y + v * v * v * p3.y),
+									((1 - v) * (1 - v) * (1 - v) * p0.z + v * v * v * p3.z));
+
+		control1.x = d * q1.x - b * q2.x;
+		control1.y = d * q1.y - b * q2.y;
+		control1.z = d * q1.z - b * q2.z;
+		control1 /= det;
+
+		control2.x = (-c) * q1.x + a * q2.x;
+		control2.y = (-c) * q1.y + a * q2.y;
+		control2.z = (-c) * q1.z + a * q2.z;
+		control2 /= det;
+
+		return true; /* success */
 	}
 
 	public BezierControlPointMode GetControlPointMode (int index) {
