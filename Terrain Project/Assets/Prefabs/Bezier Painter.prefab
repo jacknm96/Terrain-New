@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &277051489159955554
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 277051489159955556}
+  - component: {fileID: 277051489159955555}
+  m_Layer: 0
+  m_Name: Bezier Painter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &277051489159955556
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 277051489159955554}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 533.05914, y: -16.344025, z: 131.36731}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &277051489159955555
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 277051489159955554}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6287cd0b80c10f4c8720ed5b6308f0e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  points:
+  - {x: -233.05914, y: 46.344025, z: -81.36731}
+  - {x: -183.05902, y: 46.34401, z: -81.36728}
+  - {x: -133.05923, y: 46.344032, z: -81.367325}
+  - {x: -83.05914, y: 46.344025, z: -81.36731}
+  modes: 0000000000000000
+  loop: 0
+  terrain: {fileID: 0}
+  brushIMG: {fileID: 2800000, guid: 3f893818068c13c498261af150bea6f3, type: 3}
+  areaOfEffectSize: 10
+  paintStrength: 1
+  smoothStrength: 1
+  flattenHeight: 0
+  effectType: 0
+  paints: {fileID: 0}
+  paint: 1
+  stepsPerCurve: 5
+  curvesToSplitInto: 3
+  paintTerrain: 0
+  paintHeight: 1
+  painting: 0
+  heightAdjustmentArea: 10
+  heightPathArea: 5
+  heightAdjustmentSlope: 1
+  useSlopeCurve: 0
+  slopeCurve:
+    serializedVersion: 2
+    m_Curve: []
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
