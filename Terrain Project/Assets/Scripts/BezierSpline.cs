@@ -155,9 +155,9 @@ public class BezierSpline : MonoBehaviour {
 			float u = controlT + stepSize * (3 * i + 1);
 			float v = controlT + stepSize * (3 * i + 2);
 			float w = controlT + stepSize * (3 * i + 3);
-			Vector3 p1 = GetPoint(u);
-			Vector3 p2 = GetPoint(v);
-			Vector3 p3 = GetPoint(w);
+			Vector3 p1 = transform.InverseTransformPoint(GetPoint(u));
+			Vector3 p2 = transform.InverseTransformPoint(GetPoint(v));
+			Vector3 p3 = transform.InverseTransformPoint(GetPoint(w));
 			Vector3 control1 = Vector3.zero, control2 = Vector3.zero;
 			CalculateBezierControlPoints(p0, p1, p2, p3, 1 / 3.0f, 2 / 3.0f, ref control1, ref control2);
 			int tempIndex = controlIndex + 3 * i;

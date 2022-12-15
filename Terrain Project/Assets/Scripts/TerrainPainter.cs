@@ -28,41 +28,36 @@ public class TerrainPainter : BezierSpline
     public Texture2D brushIMG; // This will allow you to switch brushes
     float[,] paintBrush; // this stores the brush.png pixel data
     float[,] heightBrush; // this stores the brush.png pixel data
-    public int areaOfEffectSize = 100; // size of the brush
+    public int areaOfEffectSize = 10; // size of the brush
     [Range(0.01f, 1f)] // you can remove this if you want
-    public float paintStrength; // brush strength
-    public float smoothStrength; // height strength
-    public float flattenHeight = 0; // the height to which the flatten mode will go
+    public float paintStrength = 1; // brush strength
+    public float smoothStrength = 1; // height strength
+    public float flattenHeight; // the height to which the flatten mode will go
     public EffectType effectType;
     public TerrainLayer paints;// a list containing all of the paints
-    public int paint; // variable to select paint
+    public int paint = 1; // variable to select paint
     float[,,] splat; // A splat map is what unity uses to overlay all of your paints on to the terrain
     float[,,] undoSplatHolder = new float[0, 0, 0]; // holds splat map information from when we started editing for the purpose of reverting changes
-    public int stepsPerCurve;
-    public int curvesToSplitInto;
-    public bool paintTerrain;
-    public bool paintHeight;
-    public bool painting;
+    public int stepsPerCurve = 5;
+    public int curvesToSplitInto = 3;
+    public bool paintTerrain = false;
+    public bool paintHeight = false;
+    public bool painting = false;
 
-    public int heightAdjustmentArea;
+    public int heightAdjustmentArea = 10;
     public int heightPathArea;
     public float heightAdjustmentSlope;
     public bool useSlopeCurve;
     public AnimationCurve slopeCurve;
-
-    Vector3 startPos;
-    Vector3 endPos;
 
     Vector3[] projectedPoints;
     
     // Start is called before the first frame update
     void Start()
     {
-        GenerateBrush(brushIMG, areaOfEffectSize);
-        GenerateBrush(brushIMG, heightAdjustmentArea, true);
-        effectType = EffectType.paint;
+        /*effectType = EffectType.paint;
         terrain = FindObjectOfType<Terrain>();
-        currentTerrainData = terrain.terrainData;
+        currentTerrainData = terrain.terrainData;*/
     }
 
     // Update is called once per frame
@@ -118,7 +113,7 @@ public class TerrainPainter : BezierSpline
     /// <param name="z"></param>
     public void GetTerrainCoordinates(Vector3 point, out int x, out int z)
     {
-        Vector3 tempTerrainCoodinates = point - transform.position;
+        Vector3 tempTerrainCoodinates = transform.TransformPoint(point);
         //This takes the world coords and makes them relative to the terrain
         Vector3 terrainCoordinates = new Vector3(
             tempTerrainCoodinates.x / GetTerrainSize().x,
@@ -453,11 +448,6 @@ public class TerrainPainter : BezierSpline
         else if (paintStrength < 0.01f)
         { paintStrength = 0.01f; }
     }
-    public void SetBrush(bool height = false)
-    {
-        GenerateBrush(brushIMG, height ? heightAdjustmentArea : areaOfEffectSize, height);
-        //RMC.SetIndicators();
-    }
 
     public void SetHeights()
     {
@@ -691,12 +681,12 @@ public class TerrainPainter : BezierSpline
 
     public void StartTerrainPaint()
     {
-        undoSplatHolder = terrain.terrainData.GetAlphamaps(0, 0, terrain.terrainData.alphamapWidth, terrain.terrainData.alphamapHeight);
+        if (terrain != null) undoSplatHolder = terrain.terrainData.GetAlphamaps(0, 0, terrain.terrainData.alphamapWidth, terrain.terrainData.alphamapHeight);
     }
 
     public void UndoTerrainPaint()
     {
-        terrain.terrainData.SetAlphamaps(0, 0, undoSplatHolder);
+        if (terrain != null) terrain.terrainData.SetAlphamaps(0, 0, undoSplatHolder);
     }
     
     public void StartHeightAdjustment()
@@ -711,9 +701,12 @@ public class TerrainPainter : BezierSpline
 
     public void UndoPaint()
     {
-        if (undoSplatHolder.Length > 0) UndoTerrainPaint();
-        if (undoHeightHolder.Length > 0) UndoHeightAdjustment();
-        terrain.Flush();
+        if (terrain != null)
+        {
+            if (undoSplatHolder.Length > 0) UndoTerrainPaint();
+            if (undoHeightHolder.Length > 0) UndoHeightAdjustment();
+            terrain.Flush();
+        }
     }
 
     public void Bake()
@@ -764,10 +757,29 @@ public class TerrainPainter : BezierSpline
         }*/
     }
 
+    public void LinkTerrain()
+    {
+        Vector3 point;
+        int steps = stepsPerCurve * CurveCount;
+        Ray ray;
+        RaycastHit hit;
+        for (int i = 0; i <= steps; i++)
+        {
+            point = GetPoint(i / (float)steps);
+            ray = new Ray(point + Vector3.up, Vector3.down);
+            if (Physics.Raycast(ray, out hit) && hit.collider.TryGetComponent<Terrain>(out Terrain temp)) // check if point on bezier actually above terrain
+            {
+                terrain = temp;
+                SetEditValues(terrain);
+                return;
+            }
+        }
+        terrain = null;
+    }
+
     public void PaintAlongProjectedBezier()
     {
-        if (terrain == null) terrain = GetComponent<Terrain>();
-        SetEditValues(terrain);
+        if (terrain == null) return;
         GenerateProjectedCoords();
 
         if (paintTerrain)
@@ -825,18 +837,21 @@ public class TerrainPainter : BezierSpline
             }
             if (smoothStrength > 0) // smooth
             {
-                for (int i = minX; i <= maxX; i++)
+                for (int p = 0; p < 5; p++) // 5 passes
                 {
-                    for (int j = minY; j <= maxY; j++)
+                    for (int i = minX; i <= maxX; i++)
                     {
-                        float smoothH = GetSurroundingHeights(heights, j, i);
-                        float h = heights[j, i];
-                        heights[j, i] = Mathf.Lerp(h, smoothH, smoothStrength);
+                        for (int j = minY; j <= maxY; j++)
+                        {
+                            float smoothH = GetSurroundingHeights(heights, j, i);
+                            float h = heights[j, i];
+                            heights[j, i] = Mathf.Lerp(h, smoothH, smoothStrength);
+                        }
                     }
                 }
             }
+            terrain.terrainData.SetHeights(0, 0, heights);
         }
-        terrain.terrainData.SetHeights(0, 0, heights);
     }
 
     List<Vector3> lut = new List<Vector3>();
