@@ -51,7 +51,7 @@ MonoBehaviour:
   modes: 0000000000000000
   loop: 0
   terrain: {fileID: 0}
-  brushIMG: {fileID: 2800000, guid: 3f893818068c13c498261af150bea6f3, type: 3}
+  brushIMG: {fileID: 2800000, guid: da3715aaef5bc544880d48b5cd3f4fbd, type: 3}
   areaOfEffectSize: 10
   paintStrength: 1
   smoothStrength: 1
@@ -61,8 +61,8 @@ MonoBehaviour:
   paint: 1
   stepsPerCurve: 5
   curvesToSplitInto: 3
-  paintTerrain: 0
-  paintHeight: 1
+  paintTerrain: 1
+  paintHeight: 0
   painting: 0
   heightAdjustmentArea: 10
   heightPathArea: 5
