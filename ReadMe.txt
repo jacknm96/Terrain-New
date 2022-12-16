@@ -6,7 +6,7 @@ Bezier Splines.
 
 ### Installation
 
-Download and extract Zip file. Upon project using UnityHub.
+Download and extract Zip file. Open project using UnityHub.
 
 ### How to use
 
