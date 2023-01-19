@@ -177,45 +177,16 @@ public class TerrainPainterInspector : Editor
         {
 			EditorGUILayout.BeginHorizontal();
 
-			EditorGUI.BeginChangeCheck();
-			curvesToSplitInto = EditorGUILayout.IntField("Curves To Split", painter.curvesToSplitInto);
-			if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-			{
-				Undo.RecordObject(painter, "Curves To Split");
-				curvesToSplitInto = Mathf.Max(curvesToSplitInto, 2);
-				painter.curvesToSplitInto = curvesToSplitInto;
-				EditorUtility.SetDirty(painter);
-			}
+			AddField(ref curvesToSplitInto, ref painter.curvesToSplitInto, EditorGUILayout.IntField, new GUIContent("Curves To Split"), false, "Change Split Divisions");
 
-			if (GUILayout.Button("Split"))
-			{
-				Undo.RecordObject(painter, "Split Curve");
-				painter.SplitCurve(painter.curvesToSplitInto, selectedIndex);
-				decidingSplit = false;
-				if (painting)
-				{
-					painter.UndoPaint();
-					painter.PaintAlongProjectedBezier();
-				}
-				EditorUtility.SetDirty(painter);
-			}
+			AddButton(SplitCurves, new GUIContent("Split"), painting, "Split Curve");
 
-			if (GUILayout.Button("Cancel"))
-			{
-				Undo.RecordObject(painter, "Cancel Split");
-				decidingSplit = false;
-				EditorUtility.SetDirty(painter);
-			}
+			AddButton(() => decidingSplit = false, new GUIContent("Cancel"), false, "Cancel Split");
 
 			EditorGUILayout.EndHorizontal();
         }
 		//add a button for splitting the curve
-		else if (GUILayout.Button("Split Curve"))
-		{
-			Undo.RecordObject(painter, "Decide Split");
-			decidingSplit = true;
-			EditorUtility.SetDirty(painter);
-		}
+		else AddButton(() => decidingSplit = true, new GUIContent("Split Curve"), false, "Decide Split");
 	}
 
 	//for a custom Inspector
@@ -225,37 +196,12 @@ public class TerrainPainterInspector : Editor
 		EditorGUILayout.LabelField("Painting Info", EditorStyles.boldLabel);
 
 		// set steps per curve
-		EditorGUI.BeginChangeCheck();
-		stepSizePerCurve = EditorGUILayout.IntField(new GUIContent("Steps Per Curve", "Iterations per curve the painter will cast to the terrain"), painter.stepsPerCurve); ;
-		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-		{
-			Undo.RecordObject(painter, "Change Steps Per Curve");
-			stepSizePerCurve = Mathf.Max(stepSizePerCurve, 1);
-			painter.stepsPerCurve = stepSizePerCurve;
-			if (painting)
-			{
-				painter.UndoPaint();
-				painter.PaintAlongProjectedBezier();
-			}
-			EditorUtility.SetDirty(painter);
-		}
+		AddClampedField(ref stepSizePerCurve, ref painter.stepsPerCurve, EditorGUILayout.IntField, 
+			new GUIContent("Steps Per Curve", "Iterations per curve the painter will cast to the terrain"), painting, "Change Steps Per Curve", 1, int.MaxValue);
 
 		// align height toggle
-		EditorGUI.BeginChangeCheck();
-		terrainPaint = EditorGUILayout.Toggle("Paint Texture", painter.paintTerrain);
-		if (EditorGUI.EndChangeCheck())
-		{
-			Undo.RecordObject(painter, "Paint toggle");
-			painter.paintTerrain = terrainPaint;
-			if (painting)
-			{
-				if (terrainPaint) painter.StartTerrainPaint();
-				else painter.UndoTerrainPaint();
-				painter.UndoPaint();
-				painter.PaintAlongProjectedBezier();
-			}
-			EditorUtility.SetDirty(painter);
-		}
+		AddField(ref terrainPaint, ref painter.paintTerrain, EditorGUILayout.Toggle, new GUIContent("Paint Texture"), painting, "Paint Toggle", CacheSplatMap);
+
 		if (terrainPaint)
         {
 			foldoutPaintingSettings = EditorGUILayout.Foldout(foldoutPaintingSettings, "Paintbrush Settings");
@@ -263,36 +209,10 @@ public class TerrainPainterInspector : Editor
 			{
 				EditorGUI.indentLevel++;
 				// set brush size
-				EditorGUI.BeginChangeCheck();
-				brushSize = EditorGUILayout.IntField("Brush Size", painter.areaOfEffectSize);
-				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-				{
-					Undo.RecordObject(painter, "Change Brush Size");
-					brushSize = Mathf.Max(brushSize, 2);
-					painter.areaOfEffectSize = brushSize;
-					if (painting)
-					{
-						painter.UndoPaint();
-						painter.PaintAlongProjectedBezier();
-					}
-					EditorUtility.SetDirty(painter);
-				}
+				AddClampedField(ref brushSize, ref painter.areaOfEffectSize, EditorGUILayout.IntField, new GUIContent("Brush Size"), painting, "Change Brush Size", 2, int.MaxValue);
 
 				// set brush strength
-				EditorGUI.BeginChangeCheck();
-				brushStrength = EditorGUILayout.Slider(new GUIContent("Brush Strength", "Opacity"), painter.paintStrength, 0.0f, 1.0f);
-				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-				{
-					Undo.RecordObject(painter, "Change Brush Strength");
-					brushStrength = Mathf.Clamp01(brushStrength);
-					painter.paintStrength = brushStrength;
-					if (painting)
-					{
-						painter.UndoPaint();
-						painter.PaintAlongProjectedBezier();
-					}
-					EditorUtility.SetDirty(painter);
-				}
+				AddSliderField(ref brushStrength, ref painter.paintStrength, EditorGUILayout.Slider, new GUIContent("Brush Strength", "Opacity"), painting, "Change Brush Strength", 0.0f, 1.0f);
 
 				// set brush img
 				EditorGUI.BeginChangeCheck();
@@ -312,43 +232,17 @@ public class TerrainPainterInspector : Editor
 				}
 
 				// set paint texture
-				EditorGUI.BeginChangeCheck();
-				layerPaint = EditorGUILayout.IntField(new GUIContent("Paint Layer", "Index of the layer paint to use from the terrain component"), painter.paint);
-				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-				{
-					Undo.RecordObject(painter, "Change Paint Layer");
-					layerPaint = Mathf.Max(layerPaint, 0);
-					painter.paint = layerPaint;
-					if (painting)
-					{
-						painter.UndoPaint();
-						painter.PaintAlongProjectedBezier();
-					}
-					EditorUtility.SetDirty(painter);
-				}
+				AddClampedField(ref layerPaint, ref painter.paint, EditorGUILayout.IntField, new GUIContent("Paint Layer", "Index of the layer paint to use from the terrain component"), painting, "Change Paint Layer", 0, int.MaxValue);
 				EditorGUI.indentLevel--;
 			}
 		}
 
 		EditorGUILayout.Space();
 
-		// align height toggle
-		EditorGUI.BeginChangeCheck();
-		alignHeight = EditorGUILayout.Toggle("Snap Height", painter.paintHeight);
-		if (EditorGUI.EndChangeCheck())
-        {
-			Undo.RecordObject(painter, "Height toggle");
-			painter.paintHeight = alignHeight;
-			if (painting)
-			{
-				if (alignHeight) painter.StartHeightAdjustment();
-				else painter.UndoHeightAdjustment();
-				painter.UndoPaint();
-				painter.PaintAlongProjectedBezier();
-			}
-			EditorUtility.SetDirty(painter);
-        }
-		if (alignHeight)
+        // align height toggle
+        AddField(ref alignHeight, ref painter.paintHeight, EditorGUILayout.Toggle, new GUIContent("Snap Height"), painting, "Paint Height Toggle", CacheHeightMap);
+
+        if (alignHeight)
 		{
 			foldoutHeightSettings = EditorGUILayout.Foldout(foldoutHeightSettings, "Height Alignment Settings");
 			if (foldoutHeightSettings)
@@ -356,20 +250,7 @@ public class TerrainPainterInspector : Editor
 				EditorGUI.indentLevel++;
 
 				// set height adjustment area
-				EditorGUI.BeginChangeCheck();
-				heightArea = EditorGUILayout.IntField(new GUIContent("Brush Size", "Area to be adjusted by height alignment"), painter.heightAdjustmentArea);
-				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-				{
-					Undo.RecordObject(painter, "Change Height Area");
-					heightArea = Mathf.Max(heightArea, 1);
-					painter.heightAdjustmentArea = heightArea;
-					if (painting)
-					{
-						painter.UndoPaint();
-						painter.PaintAlongProjectedBezier();
-					}
-					EditorUtility.SetDirty(painter);
-				}
+				AddClampedField(ref heightArea, ref painter.heightAdjustmentArea, EditorGUILayout.IntField, new GUIContent("Brush Size", "Area to be adjusted by height alignment"), painting, "Change Height Area", 1, int.MaxValue);
 
 				// set path adjustment area
 				EditorGUI.BeginChangeCheck();
@@ -388,67 +269,15 @@ public class TerrainPainterInspector : Editor
 				}
 
 				// set height adjustment slope
-				EditorGUI.BeginChangeCheck();
-				heightSlope = EditorGUILayout.Slider(new GUIContent("Brush Slope", "Value of 0 will be completely flat, 1 is a sheer cliff"), painter.heightAdjustmentSlope, 0.0f, 1.0f);
-				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-				{
-					Undo.RecordObject(painter, "Change Height Slope");
-					heightSlope = Mathf.Clamp01(heightSlope);
-					painter.heightAdjustmentSlope = heightSlope;
-					if (painting)
-					{
-						painter.UndoPaint();
-						painter.PaintAlongProjectedBezier();
-					}
-					EditorUtility.SetDirty(painter);
-				}
+				AddSliderField(ref heightSlope, ref painter.heightAdjustmentSlope, EditorGUILayout.Slider, new GUIContent("Brush Slope", "Value of 0 will be completely flat, 1 is a sheer cliff"), painting, "Change Height Slope", 0.0f, 1.0f);
 
 				// set height smoothing strength
-				EditorGUI.BeginChangeCheck();
-				smoothStrength = EditorGUILayout.Slider(new GUIContent("Smoothing", "Value of 0 will have no smoothing"), painter.smoothStrength, 0.0f, 1.0f);
-				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-				{
-					Undo.RecordObject(painter, "Change Smoothing");
-					smoothStrength = Mathf.Clamp01(smoothStrength);
-					painter.smoothStrength = smoothStrength;
-					if (painting)
-					{
-						painter.UndoPaint();
-						painter.PaintAlongProjectedBezier();
-					}
-					EditorUtility.SetDirty(painter);
-				}
+				AddSliderField(ref smoothStrength, ref painter.smoothStrength, EditorGUILayout.Slider, new GUIContent("Smoothing", "Value of 0 will have no smoothing"), painting, "Change Smoothing", 0.0f, 1.0f);
 
 				// use slope curve toggle
-				EditorGUI.BeginChangeCheck();
-				useSlopeCurve = EditorGUILayout.Toggle("Use Slope Curve", painter.useSlopeCurve);
-				if (EditorGUI.EndChangeCheck())
-				{
-					Undo.RecordObject(painter, "Use Slope toggle");
-					painter.useSlopeCurve = useSlopeCurve;
-					if (painting)
-					{
-						painter.UndoPaint();
-						painter.PaintAlongProjectedBezier();
-					}
-					EditorUtility.SetDirty(painter);
-				}
-				if (useSlopeCurve)
-                {
-					EditorGUI.BeginChangeCheck();
-					slopeCurve = EditorGUILayout.CurveField("Use Slope Curve", painter.slopeCurve);
-					if (EditorGUI.EndChangeCheck())
-					{
-						Undo.RecordObject(painter, "Change Slope Curve");
-						painter.slopeCurve = slopeCurve;
-						if (painting)
-						{
-							painter.UndoPaint();
-							painter.PaintAlongProjectedBezier();
-						}
-						EditorUtility.SetDirty(painter);
-					}
-				}
+				AddField(ref useSlopeCurve, ref painter.useSlopeCurve, EditorGUILayout.Toggle, new GUIContent("Use Slope Curve"), painting, "Slope Toggle");
+
+				if (useSlopeCurve) AddField(ref slopeCurve, ref painter.slopeCurve, EditorGUILayout.CurveField, new GUIContent("Use Slope Curve"), painting, "Change Slope Curve");
 
 				EditorGUI.indentLevel--;
 			}
@@ -460,45 +289,15 @@ public class TerrainPainterInspector : Editor
 
 		EditorGUILayout.Space();
 
-		// start painting
-		EditorGUI.BeginChangeCheck();
-		painting = EditorGUILayout.Toggle("Start Painting", painter.painting);
-		if (EditorGUI.EndChangeCheck())
+        // start painting
+        if (painting)
 		{
-			Undo.RecordObject(painter, "Start/Stop Painting");
-			if (painting)
-			{
-				painter.LinkTerrain();
-				painter.StartPainting(); // cache paint values when start painting for reverting
-				painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
-				painter.PaintAlongProjectedBezier();
-			}
-			else
-			{
-				painter.UndoPaint();
-				painter.painting = painting = false;
-			}
-			EditorUtility.SetDirty(painter);
-		}
-		if (painting)
-        {
 			//reset button
-			if (GUILayout.Button("Revert Changes"))
-			{
-				Undo.RecordObject(painter, "Reverting Changes");
-				painter.UndoPaint();
-				painter.painting = painting = false;
-				EditorUtility.SetDirty(painter);
-			}
+			AddButton(() => { painter.UndoPaint(); painter.painting = painting = false; }, new GUIContent("Stop Painting", "Will Undo Changes to Terrain, Keeps any values set"), false, "Stop Painting");
 			//bake changes
-			if (GUILayout.Button("Bake"))
-			{
-				Undo.RecordObject(painter, "Bake Paints");
-				painter.Bake();
-				painter.painting = painting = false;
-				EditorUtility.SetDirty(painter);
-			}
+			AddButton(() => { painter.Bake(); painter.painting = painting = false; }, new GUIContent("Bake", "Bakes Terrain Changes"), false, "Stop Painting");
 		}
+		else AddButton(StartPainting, new GUIContent("Start Painting"), false, "Start Painting");
 		
 
 		EditorGUILayout.Space();
@@ -508,49 +307,31 @@ public class TerrainPainterInspector : Editor
 
 		EditorGUI.BeginChangeCheck();
 
-		//add an option to connect the first and last nodes 
-		bool loop = EditorGUILayout.Toggle("Loop", painter.Loop);
+        //add an option to connect the first and last nodes 
+		//TODO: Fix looping functionality
+        /*bool loop = EditorGUILayout.Toggle("Loop", painter.Loop);
 
-		showVelocity = EditorGUILayout.Toggle("Show Velocity", showVelocity);
+        showVelocity = EditorGUILayout.Toggle("Show Velocity", showVelocity);
 
 
-		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-		{
-			Undo.RecordObject(painter, "Toggle Loop");
-			painter.Loop = loop;
-			EditorUtility.SetDirty(painter);
-		}
+        if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+        {
+            Undo.RecordObject(painter, "Toggle Loop");
+            painter.Loop = loop;
+            EditorUtility.SetDirty(painter);
+        }*/
 
-		if (selectedIndex >= 0 && selectedIndex < painter.GetPointCount)   //if default selected value of -1 we do not draw the point inspector
+        if (selectedIndex >= 0 && selectedIndex < painter.GetPointCount)   //if default selected value of -1 we do not draw the point inspector
 		{
 			DrawSelectedPointInspector();
 		}
 		//add a button for adding a curve to the spline
-		if (GUILayout.Button("Add Curve"))
-		{
-			Undo.RecordObject(painter, "Add Curve");
-			painter.AddCurve();
-			if (painting)
-			{
-				painter.UndoPaint();
-				painter.PaintAlongProjectedBezier();
-			}
-			EditorUtility.SetDirty(painter);
-		}
+		AddButton(painter.AddCurve, new GUIContent("Add Curve"), painting, "Add Curve");
+
 		if (painter.CurveCount > 1)
         {
 			//add a button for removing a curve from the spline
-			if (GUILayout.Button("Remove Curve"))
-			{
-				Undo.RecordObject(painter, "Remove Curve");
-				painter.RemoveCurve();
-				if (painting)
-                {
-					painter.UndoPaint();
-					painter.PaintAlongProjectedBezier();
-				}
-				EditorUtility.SetDirty(painter);
-			}
+			AddButton(painter.RemoveCurve, new GUIContent("Remove Curve"), painting, "Remove Curve");
 		}
 
 	}
@@ -660,6 +441,102 @@ public class TerrainPainterInspector : Editor
 		}
 		return controlPoints;
     }
+
+	void AddField<T>(ref T editorField, ref T painterField, System.Func<GUIContent, T, GUILayoutOption[], T> fieldFunc, GUIContent label, bool repaint, string undoMessage, System.Action additionalFunctionality = null, GUILayoutOption[] context = null)
+    {
+		EditorGUI.BeginChangeCheck();
+		editorField = fieldFunc(label, painterField, context);
+		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+		{
+			Undo.RecordObject(painter, undoMessage);
+			painterField = editorField;
+			if (repaint)
+			{
+				if (additionalFunctionality != null) additionalFunctionality();
+				painter.UndoPaint();
+				painter.PaintAlongProjectedBezier();
+			}
+			EditorUtility.SetDirty(painter);
+		}
+	}
+
+	void AddClampedField(ref int editorField, ref int painterField, System.Func<GUIContent, int, GUILayoutOption[], int> fieldFunc, GUIContent label, bool repaint, string undoMessage, int clampMin, int clampMax, GUILayoutOption[] context = null)
+	{
+		EditorGUI.BeginChangeCheck();
+		editorField = fieldFunc(label, painterField, context);
+		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+		{
+			Undo.RecordObject(painter, undoMessage);
+			editorField = Mathf.Clamp(editorField, clampMin, clampMax);
+			painterField = editorField;
+			if (repaint)
+			{
+				painter.UndoPaint();
+				painter.PaintAlongProjectedBezier();
+			}
+			EditorUtility.SetDirty(painter);
+		}
+	}
+
+	void AddSliderField(ref float editorField, ref float painterField, System.Func<GUIContent, float, float, float, GUILayoutOption[], float> fieldFunc, GUIContent label, bool repaint, string undoMessage, float sliderMin, float sliderMax, GUILayoutOption[] context = null)
+	{
+		EditorGUI.BeginChangeCheck();
+		editorField = fieldFunc(label, painterField, sliderMin, sliderMax, context);
+		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
+		{
+			Undo.RecordObject(painter, undoMessage);
+			editorField = Mathf.Clamp(editorField, sliderMin, sliderMax);
+			painterField = editorField;
+			if (repaint)
+			{
+				painter.UndoPaint();
+				painter.PaintAlongProjectedBezier();
+			}
+			EditorUtility.SetDirty(painter);
+		}
+	}
+
+	void AddButton(System.Action onClick, GUIContent label, bool repaint, string undoMessage, GUILayoutOption[] context = null)
+    {
+		if (GUILayout.Button(label, context))
+		{
+			Undo.RecordObject(painter, "Split Curve");
+			onClick();
+			if (repaint)
+			{
+				painter.UndoPaint();
+				painter.PaintAlongProjectedBezier();
+			}
+			EditorUtility.SetDirty(painter);
+		}
+	}
+
+	void StartPainting()
+    {
+		painting = painter.painting = true;
+		painter.LinkTerrain();
+		painter.StartPainting(); // cache paint values when start painting for reverting
+		painter.GenerateBrush(painter.brushIMG, painter.areaOfEffectSize);
+		painter.PaintAlongProjectedBezier();
+	}
+
+	void CacheSplatMap()
+    {
+		if (terrainPaint) painter.StartTerrainPaint();
+		else painter.UndoTerrainPaint();
+	}
+
+	void CacheHeightMap()
+    {
+		if (alignHeight) painter.StartHeightAdjustment();
+		else painter.UndoHeightAdjustment();
+	}
+
+	void SplitCurves()
+    {
+		painter.SplitCurve(painter.curvesToSplitInto, selectedIndex);
+		decidingSplit = false;
+	}
 
 	void OnUndo()
 	{
