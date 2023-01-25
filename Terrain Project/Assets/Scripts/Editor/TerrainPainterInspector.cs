@@ -164,16 +164,16 @@ public class TerrainPainterInspector : Editor
 			EditorUtility.SetDirty(painter);
 		}
 
-		EditorGUI.BeginChangeCheck();  //set the mode of the selected point
-		BezierControlPointMode mode = (BezierControlPointMode)EditorGUILayout.EnumPopup("Mode", painter.GetControlPointMode(selectedIndex));
-		if (EditorGUI.EndChangeCheck())
-		{
-			Undo.RecordObject(painter, "Change Point Mode");
-			painter.SetControlPointMode(selectedIndex, mode);
-			EditorUtility.SetDirty(painter);
-		}
+        EditorGUI.BeginChangeCheck();  //set the mode of the selected point
+        BezierControlPointMode mode = (BezierControlPointMode)EditorGUILayout.EnumPopup("Mode", painter.GetControlPointMode(selectedIndex));
+        if (EditorGUI.EndChangeCheck())
+        {
+            Undo.RecordObject(painter, "Change Point Mode");
+            painter.SetControlPointMode(selectedIndex, mode);
+            EditorUtility.SetDirty(painter);
+        }
 
-		if (decidingSplit)
+        if (decidingSplit)
         {
 			EditorGUILayout.BeginHorizontal();
 
@@ -212,7 +212,7 @@ public class TerrainPainterInspector : Editor
 				AddClampedField(ref brushSize, ref painter.areaOfEffectSize, EditorGUILayout.IntField, new GUIContent("Brush Size"), painting, "Change Brush Size", 2, int.MaxValue);
 
 				// set brush strength
-				AddSliderField(ref brushStrength, ref painter.paintStrength, EditorGUILayout.Slider, new GUIContent("Brush Strength", "Opacity"), painting, "Change Brush Strength", 0.0f, 1.0f);
+				AddSliderField(ref brushStrength, ref painter.paintStrength, EditorGUILayout.Slider, new GUIContent("Brush Strength", "Opacity"), painting, "Change Brush Strength", 0.0f, 1.0f, () => brushStrength = Mathf.Clamp01(brushStrength));
 
 				// set brush img
 				EditorGUI.BeginChangeCheck();
@@ -250,29 +250,16 @@ public class TerrainPainterInspector : Editor
 				EditorGUI.indentLevel++;
 
 				// set height adjustment area
-				AddClampedField(ref heightArea, ref painter.heightAdjustmentArea, EditorGUILayout.IntField, new GUIContent("Brush Size", "Area to be adjusted by height alignment"), painting, "Change Height Area", 1, int.MaxValue);
+				AddClampedField(ref heightArea, ref painter.heightAdjustmentArea, EditorGUILayout.IntField, new GUIContent("Brush Size", "Area to be adjusted by height alignment"), painting, "Change Height Area", 1, int.MaxValue, () => painter.heightPathArea = Mathf.Min(heightArea, painter.heightPathArea));
 
 				// set path adjustment area
-				EditorGUI.BeginChangeCheck();
-				pathArea = EditorGUILayout.IntSlider(new GUIContent("Path Area", "Flat area for path"), painter.heightPathArea, 0, painter.heightAdjustmentArea);
-				if (EditorGUI.EndChangeCheck()) //returns true if editor changes
-				{
-					Undo.RecordObject(painter, "Change Path Area");
-					pathArea = Mathf.Max(pathArea, 0);
-					painter.heightPathArea = pathArea;
-					if (painting)
-					{
-						painter.UndoPaint();
-						painter.PaintAlongProjectedBezier();
-					}
-					EditorUtility.SetDirty(painter);
-				}
+				AddSliderField(ref pathArea, ref painter.heightPathArea, EditorGUILayout.IntSlider, new GUIContent("Path Area", "Flat area for path"), painting, "Change Path Area", 0, painter.heightAdjustmentArea, () => pathArea = Mathf.Clamp(pathArea, 0, painter.heightAdjustmentArea));
 
 				// set height adjustment slope
-				AddSliderField(ref heightSlope, ref painter.heightAdjustmentSlope, EditorGUILayout.Slider, new GUIContent("Brush Slope", "Value of 0 will be completely flat, 1 is a sheer cliff"), painting, "Change Height Slope", 0.0f, 1.0f);
+				AddSliderField(ref heightSlope, ref painter.heightAdjustmentSlope, EditorGUILayout.Slider, new GUIContent("Brush Slope", "Value of 0 will be completely flat, 1 is a sheer cliff"), painting, "Change Height Slope", 0.0f, 1.0f, () => heightSlope = Mathf.Clamp01(heightSlope));
 
 				// set height smoothing strength
-				AddSliderField(ref smoothStrength, ref painter.smoothStrength, EditorGUILayout.Slider, new GUIContent("Smoothing", "Value of 0 will have no smoothing"), painting, "Change Smoothing", 0.0f, 1.0f);
+				AddSliderField(ref smoothStrength, ref painter.smoothStrength, EditorGUILayout.Slider, new GUIContent("Smoothing", "Value of 0 will have no smoothing"), painting, "Change Smoothing", 0.0f, 1.0f, () => smoothStrength = Mathf.Clamp01(smoothStrength));
 
 				// use slope curve toggle
 				AddField(ref useSlopeCurve, ref painter.useSlopeCurve, EditorGUILayout.Toggle, new GUIContent("Use Slope Curve"), painting, "Slope Toggle");
@@ -305,11 +292,11 @@ public class TerrainPainterInspector : Editor
 
 		EditorGUILayout.LabelField("Bezier Info", EditorStyles.boldLabel);
 
-		EditorGUI.BeginChangeCheck();
+		/*EditorGUI.BeginChangeCheck();
 
         //add an option to connect the first and last nodes 
-		//TODO: Fix looping functionality
-        /*bool loop = EditorGUILayout.Toggle("Loop", painter.Loop);
+        //TODO: Fix looping functionality
+        bool loop = EditorGUILayout.Toggle("Loop", painter.Loop);
 
         showVelocity = EditorGUILayout.Toggle("Show Velocity", showVelocity);
 
@@ -460,7 +447,7 @@ public class TerrainPainterInspector : Editor
 		}
 	}
 
-	void AddClampedField(ref int editorField, ref int painterField, System.Func<GUIContent, int, GUILayoutOption[], int> fieldFunc, GUIContent label, bool repaint, string undoMessage, int clampMin, int clampMax, GUILayoutOption[] context = null)
+	void AddClampedField(ref int editorField, ref int painterField, System.Func<GUIContent, int, GUILayoutOption[], int> fieldFunc, GUIContent label, bool repaint, string undoMessage, int clampMin, int clampMax, System.Action additionalFunctionality = null, GUILayoutOption[] context = null)
 	{
 		EditorGUI.BeginChangeCheck();
 		editorField = fieldFunc(label, painterField, context);
@@ -468,6 +455,7 @@ public class TerrainPainterInspector : Editor
 		{
 			Undo.RecordObject(painter, undoMessage);
 			editorField = Mathf.Clamp(editorField, clampMin, clampMax);
+			if (additionalFunctionality != null) additionalFunctionality();
 			painterField = editorField;
 			if (repaint)
 			{
@@ -478,14 +466,15 @@ public class TerrainPainterInspector : Editor
 		}
 	}
 
-	void AddSliderField(ref float editorField, ref float painterField, System.Func<GUIContent, float, float, float, GUILayoutOption[], float> fieldFunc, GUIContent label, bool repaint, string undoMessage, float sliderMin, float sliderMax, GUILayoutOption[] context = null)
+	void AddSliderField<T>(ref T editorField, ref T painterField, System.Func<GUIContent, T, T, T, GUILayoutOption[], T> fieldFunc, GUIContent label, bool repaint, string undoMessage, T sliderMin, T sliderMax, System.Action additionalFunctionality = null, GUILayoutOption[] context = null)
 	{
 		EditorGUI.BeginChangeCheck();
 		editorField = fieldFunc(label, painterField, sliderMin, sliderMax, context);
 		if (EditorGUI.EndChangeCheck()) //returns true if editor changes
 		{
 			Undo.RecordObject(painter, undoMessage);
-			editorField = Mathf.Clamp(editorField, sliderMin, sliderMax);
+			if (additionalFunctionality != null) additionalFunctionality();
+			//editorField = Mathf.Clamp(editorField, sliderMin, sliderMax);
 			painterField = editorField;
 			if (repaint)
 			{
