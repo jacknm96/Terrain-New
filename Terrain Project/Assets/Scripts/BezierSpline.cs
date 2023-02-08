@@ -49,7 +49,13 @@ public class BezierSpline : MonoBehaviour {
 		}
 	}
 
-
+	public void Reposition()
+    {
+		Vector3 diff = points[0];
+		transform.position = transform.position + diff;
+		for (int i = 0; i < points.Length; i++) 
+			points[i] -= diff;
+    }
 
 
 	public Vector3 GetPoint (float t) {

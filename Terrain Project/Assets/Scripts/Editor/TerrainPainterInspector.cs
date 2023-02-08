@@ -154,7 +154,9 @@ public class TerrainPainterInspector : Editor
                     painter.SetControlPoint(index + 2, handleTransform.InverseTransformPoint(controlPoints[2]));
                 }
             }
-            else painter.SetControlPoint(selectedIndex, handleTransform.InverseTransformPoint(point)); //set the selected index
+            else 
+				painter.SetControlPoint(selectedIndex, handleTransform.InverseTransformPoint(point)); //set the selected index
+			painter.Reposition();
             //painter.SetControlPoint(selectedIndex, point); //set the selected index
             if (painting) // if painting, realign paints with modified bezier curve
 			{
@@ -416,7 +418,9 @@ public class TerrainPainterInspector : Editor
 					{
 						painter.SetControlPoint(index + 1, handleTransform.InverseTransformPoint(controlPoints[1]));
 						painter.SetControlPoint(index + 2, handleTransform.InverseTransformPoint(controlPoints[2]));
-					} else painter.SetControlPoint(index + i, handleTransform.InverseTransformPoint(handlePoints[i]));
+					} else 
+						painter.SetControlPoint(index + i, handleTransform.InverseTransformPoint(handlePoints[i]));
+					painter.Reposition();
 					if (painting) // if painting, realign paints with modified bezier curve
 					{
 						painter.UndoPaint();
@@ -489,7 +493,7 @@ public class TerrainPainterInspector : Editor
     {
 		if (GUILayout.Button(label, context))
 		{
-			Undo.RecordObject(painter, "Split Curve");
+			Undo.RecordObject(painter, undoMessage);
 			onClick();
 			if (repaint)
 			{
